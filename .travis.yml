@@ -16,19 +16,20 @@ env:
   # run tests/python
   - TASK=python_test
   - TASK=r_test
+  - TASK=perl_test
   # - TASK=julia JULIA_VER=0.4
   # - TASK=scala_test
 
   # TODO, R test, distributed test, clang, more g++ versions
 
-matrix:
-  include:
-    - os: linux
-      dist: trusty
-      env: TASK=perl_test
-    - os: osx
-      sudo: required
-      env: TASK=perl_test
+#matrix:
+#  include:
+#     - os: linux
+#       dist: trusty
+#       env: TASK=perl_test
+#     - os: osx
+#       sudo: required
+#       env: TASK=perl_test
 #       env: TASK=julia JULIA_VER=0.4
 #     - os: linux
 #       env: TASK=build

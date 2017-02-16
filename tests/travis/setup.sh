@@ -33,9 +33,9 @@ fi
 
 if [ ${TASK} == "perl_test" ]; then
     if [ ${TRAVIS_OS_NAME} == "linux" ]; then
-       cpanm -q -L "${HOME}/perl5" Function::Parameters
+       cpanm -q -n -l ${HOME}/perl5 Function::Parameters
     else
-       sudo sh -c 'curl -L https://cpanmin.us | perl - App::cpanminus'
-       sudo cpanm -q -n PDL Mouse Function::Parameters
+       curl -L https://cpanmin.us | perl - App::cpanminus
+       cpanm -q -n -l ${HOME}/perl5 PDL Mouse Function::Parameters
     fi
 fi
