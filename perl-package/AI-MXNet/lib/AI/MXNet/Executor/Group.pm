@@ -31,7 +31,6 @@ func _split_input_slice($batch_size, $work_load_list)
     }
     return \@slices;
 }
-
 # Load a list of arrays into a list of arrays specified by slices
 func _load_general($data, $targets, $major_axis)
 {
@@ -785,7 +784,7 @@ method _bind_ith_exec(
     Maybe[AI::MXNet::DataParallelExecutorGroup] $shared_group
 )
 {
-    my $shared_exec = $shared_group ? $shared_group->execs->[$i] : undef;
+    my $shared_exec = $shared_group ? $shared_group->_p->execs->[$i] : undef;
     my $context = $self->contexts->[$i];
     my $shared_data_arrays = $self->_p->shared_data_arrays->[$i];
     my %input_shapes = map { $_->name => $_->shape } @{ $data_shapes };
@@ -881,7 +880,7 @@ method _bind_ith_exec(
                 my $arg_shape = $arg_shapes->[$j];
                 confess "shapes do not match (@$arg_arr_shape) != (@$arg_shape)"
                     unless "@$arg_arr_shape" eq "@$arg_shape";
-                my $arg_arr_type = $arg_arr->type;
+                my $arg_arr_type = $arg_arr->dtype;
                 my $arg_type = $arg_types->[$j];
                 confess "types do not match $arg_arr_type) != $arg_type"
                     unless $arg_arr_type eq $arg_type;

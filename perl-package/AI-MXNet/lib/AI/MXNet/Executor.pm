@@ -8,9 +8,9 @@ use AI::MXNet::Types;
 use AI::MXNet::Function::Parameters;
 
 has 'handle'            => (is => 'ro', isa => 'ExecutorHandle', required => 1);
-has 'arg_arrays'        => (is => 'rw', isa => 'ArrayRef[AI::MXNet::NDArray]');
-has 'grad_arrays'       => (is => 'rw', isa => 'ArrayRef[Undef|AI::MXNet::NDArray]'); 
-has 'aux_arrays'        => (is => 'rw', isa => 'ArrayRef[AI::MXNet::NDArray]');
+has 'arg_arrays'        => (is => 'rw', isa => 'Maybe[ArrayRef[AI::MXNet::NDArray]]');
+has 'grad_arrays'       => (is => 'rw', isa => 'Maybe[ArrayRef[Undef|AI::MXNet::NDArray]]'); 
+has 'aux_arrays'        => (is => 'rw', isa => 'Maybe[ArrayRef[AI::MXNet::NDArray]]');
 has '_symbol'           => (is => 'rw', init_arg => 'symbol',    isa => 'AI::MXNet::Symbol');
 has '_ctx'              => (is => 'rw', init_arg => 'ctx',       isa => 'AI::MXNet::Context' );
 has '_grad_req'         => (is => 'rw', init_arg => 'grad_req',  isa => 'Maybe[Str|ArrayRef[Str]|HashRef[Str]]');

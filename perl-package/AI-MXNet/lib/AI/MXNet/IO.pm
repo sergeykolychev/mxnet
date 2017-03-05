@@ -147,7 +147,7 @@ use Mouse;
 =cut
 
 has 'data'          => (is => 'rw', isa => 'Maybe[ArrayRef[AI::MXNet::NDArray]]', required => 1);
-has 'label'         => (is => 'rw', isa => 'Maybe[ArrayRef[AI::MXNet::NDArray]]', required => 1);
+has 'label'         => (is => 'rw', isa => 'Maybe[ArrayRef[AI::MXNet::NDArray]]');
 has 'pad'           => (is => 'rw');
 has 'index'         => (is => 'rw');
 has 'bucket_key'    => (is => 'rw');
@@ -314,7 +314,7 @@ sub BUILD
     $self->batch_size($self->data_iter->batch_size);
     if($self->data_iter->can('default_bucket_key'))
     {
-        $self->default_bucket_key($self->data_iter->can('default_bucket_key'));
+        $self->default_bucket_key($self->data_iter->default_bucket_key);
     }
 }
 
@@ -362,9 +362,8 @@ method getpad()
 
 package AI::MXNet::NDArrayIter;
 use Mouse;
-use List::Util qw/shuffle/;
 use AI::MXNet::Base;
-
+use List::Util qw(shuffle);
 extends 'AI::MXNet::DataIter';
 
 =head1 DESCRIPTION
@@ -413,8 +412,8 @@ sub BUILD
     if($self->_shuffle)
     {
         my @idx = shuffle(0..$num_data-1);
-        $_->[1] = AI::MXNet::NDArray->array(cat((dog($_->[1]->aspdl))[@idx])) for @$data;
-        $_->[1] = AI::MXNet::NDArray->array(cat((dog($_->[1]->aspdl))[@idx])) for @$label;
+        $_->[1] = AI::MXNet::NDArray->array(pdl_shuffle($_->[1]->aspdl, \@idx)) for @$data;
+        $_->[1] = AI::MXNet::NDArray->array(pdl_shuffle($_->[1]->aspdl, \@idx)) for @$label;
     }
     if($self->last_batch_handle eq 'discard')
     {

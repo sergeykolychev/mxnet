@@ -349,7 +349,8 @@ method unroll(
     my @inputs = @{ $inputs };
     for my $i (0..$length-1)
     {
-        my ($output, $states) = &{$self}(
+        my $output;
+        ($output, $states) = &{$self}(
             $inputs[$i],
             $states
         );
@@ -661,7 +662,7 @@ method call(AI::MXNet::Symbol $inputs, SymbolOrArrayOfSymbols $states)
     );
     my $next_c = AI::MXNet::Symbol->_plus(
         $forget_gate * $states[1], $in_gate * $in_transform,
-        name => "{$name}state"
+        name => "${name}state"
     );
     my $next_h = AI::MXNet::Symbol->_mul(
         $out_gate,

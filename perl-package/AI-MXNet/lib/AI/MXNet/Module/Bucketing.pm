@@ -171,10 +171,10 @@ method output_shapes()
 method get_params()
 {
     assert($self->binded and $self->params_initialized);
-    $self->_curr_module->_params_dirty($self->_params_dirty);
-    my $params = $self->_curr_module->get_params;
+    $self->_curr_module->_p->_params_dirty($self->_params_dirty);
+    my ($arg_params, $aux_params) = $self->_curr_module->get_params;
     $self->_params_dirty(0);
-    return $params;
+    return ($arg_params, $aux_params);
 }
 
 =head2 set_params
@@ -251,7 +251,7 @@ method init_params(
     Bool                               :$force_init=0
 )
 {
-    return if(not $self->params_initialized and not $force_init);
+    return if($self->params_initialized and not $force_init);
     assert($self->binded, 'call bind before initializing the parameters');
     $self->_curr_module->init_params(
         initializer   => $initializer,
@@ -305,14 +305,14 @@ method set_states($states, $value)
 =cut
 
 method bind(
-    ArrayRef[AI::MXNet::DataDesc|NameShape]                    $data_shapes,
+    ArrayRef[AI::MXNet::DataDesc|NameShape]                   :$data_shapes,
     Maybe[ArrayRef[AI::MXNet::DataDesc|NameShape]]            :$label_shapes=,
     Bool                                                      :$for_training=1,
     Bool                                                      :$inputs_need_grad=0,
     Bool                                                      :$force_rebind=0,
     Maybe[AI::MXNet::BaseModule]                              :$shared_module=,
     Str|ArrayRef[Str]|HashRef[Str]                            :$grad_req='write',
-    Str                                                       :$bucket_key
+    Maybe[Str]                                                :$bucket_key=
 )
 {
     # in case we already initialized params, keep it
@@ -408,9 +408,9 @@ method switch_bucket(
             force_rebind     => 0,
             shared_module    => $self->_buckets->{ $self->_default_bucket_key },
         );
-        $self->_curr_module($module);
         $self->_buckets->{ $bucket_key } = $module;
     }
+    $self->_curr_module($self->_buckets->{ $bucket_key });
 }
 
 =head2  init_optimizer
@@ -592,6 +592,17 @@ method symbol()
 {
     assert($self->binded);
     return $self->_curr_module->symbol;
+}
+
+=head2 get_symbol
+
+    The symbol of the default bucket being used.
+=cut
+
+method get_symbol()
+{
+    assert($self->binded);
+    return $self->_buckets->{ $self->_default_bucket_key }->symbol;
 }
 
 =head2 install_monitor

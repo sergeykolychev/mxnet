@@ -328,8 +328,6 @@ method _at(Index $idx)
 
 method reshape(Shape $new_shape)
 {
-    confess("new size does not mach old size")
-        unless __PACKAGE__->size($new_shape) == $self->size;
     my $handle = check_call(
                     AI::MXNetCAPI::NDArrayReshape(
                         $self->handle,
