@@ -53,6 +53,7 @@ sub import
             sub mod { 'AI::MXNet::Module' }
             sub viz { 'AI::MXNet::Visualization' }
             sub rnn { 'AI::MXNet::RNN' }
+            sub callback { 'AI::MXNet::Callback' }
             1;
 EOP
             eval $short_name_package;

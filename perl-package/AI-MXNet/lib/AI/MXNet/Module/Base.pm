@@ -329,7 +329,7 @@ method iter_predict(AI::MXNet::DataIter $eval_data, Maybe[Int] :$num_batch=, Boo
         $self->forward($eval_batch, is_train => 0);
         my $pad = $eval_batch->pad;
         my $outputs = [
-            map { $_->slice([0, $_->shape->[0] - $pad - 1]) } @{ $self->get_outputs() }
+            map { $_->slice([0, $_->shape->[0] - ($pad//0) - 1]) } @{ $self->get_outputs() }
         ];
         push @out, [$outputs, $nbatch, $eval_batch];
         $nbatch++;
@@ -385,7 +385,7 @@ method predict(
         last if defined $num_batch and $nbatch == $num_batch;
         $self->forward($eval_batch, is_train => 0);
         my $pad = $eval_batch->pad;
-        my $outputs = [map { $_->slice([0, $_->shape0->[0]-$pad-1])->copy } @{ $self->get_outputs }];
+        my $outputs = [map { $_->slice([0, $_->shape0->[0]-($pad//0)-1])->copy } @{ $self->get_outputs }];
         push @output_list, $outputs;
     }
     return () unless @output_list;
@@ -404,16 +404,16 @@ method predict(
         for my $i (0..$num_outputs-1)
         {
             push @output_list2,
-                 AI::MXNet::NDArray->concatenate(map { $_->[$i] } @output_list);
+                 AI::MXNet::NDArray->concatenate([map { $_->[$i] } @output_list]);
         }
         if($num_outputs == 1 and not $always_output_list)
         {
             return $output_list2[0];
         }
+        return @output_list2;
     }
     return @output_list;
 }
-
 
 =head2 fit
 
@@ -525,7 +525,6 @@ method fit(
     }
     $eval_metric = AI::MXNet::Metric->create($eval_metric)
         unless blessed $eval_metric;
-
     ################################################################################
     # training loop
     ################################################################################
@@ -541,7 +540,7 @@ method fit(
             $self->update;
             $self->update_metric($eval_metric, $data_batch->label);
             $monitor->toc_print if $monitor;
-            if($batch_end_callback)
+            if(defined $batch_end_callback)
             {
                 my $batch_end_params = AI::MXNet::BatchEndParam->new(
                     epoch       => $epoch,
@@ -553,6 +552,7 @@ method fit(
                     &{$callback}($batch_end_params);
                 }
             }
+            $nbatch++;
         }
         # one epoch of training is finished
         my $name_value = $eval_metric->get_name_value;
@@ -571,7 +571,7 @@ method fit(
         {
             for my $callback (@{ _as_list($epoch_end_callback) })
             {
-                &{$callback}($epoch, $self->symbol, $arg_params, $aux_params);
+                &{$callback}($epoch, $self->get_symbol, $arg_params, $aux_params);
             }
         }
         #----------------------------------------
@@ -599,6 +599,12 @@ method fit(
 ################################################################################
 # Symbol information
 ################################################################################
+
+=head2 get_symbol
+
+        Get the symbol used by this module.
+=cut
+method get_symbol() { $self->symbol }
 
 =head2 data_names
 

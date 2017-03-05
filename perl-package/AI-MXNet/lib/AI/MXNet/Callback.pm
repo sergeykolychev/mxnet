@@ -197,4 +197,25 @@ method call(AI::MXNet::BatchEndParam $param)
     }
 }
 
+package AI::MXNet::Callback;
+
+method Speedometer
+{
+    AI::MXNet::Speedometer->new(
+        @_ == 2 ? (batch_size => $_[0], frequent => $_[1]) : (batch_size => $_[0])
+    )
+}
+
+method ProgressBar
+{
+    AI::MXNet::ProgressBar->new(
+        @_ == 2 ? (total => $_[0], 'length' => $_[1]) : (total => $_[0])
+    )
+}
+
+method LogValidationMetricsCallback
+{
+    AI::MXNet::LogValidationMetricsCallback->new
+}
+
 1;
