@@ -1,4 +1,6 @@
 package AI::MXNet::RNN::IO;
+use strict;
+use warnings;
 use AI::MXNet::Base;
 use AI::MXNet::Function::Parameters;
 
@@ -48,11 +50,11 @@ use AI::MXNet::Function::Parameters;
 
 
 method encode_sentences(
-    ArrayRef[ArrayRef] $sentences,
-    Maybe[HashRef]     $vocab=,
-    Int                $invalid_label=-1,
-    Str                $invalid_key="\n",
-    Int                $start_label=0
+    ArrayRef[ArrayRef]  $sentences,
+    Maybe[HashRef]     :$vocab=,
+    Int                :$invalid_label=-1,
+    Str                :$invalid_key="\n",
+    Int                :$start_label=0
 )
 {
     my $idx = $start_label;
@@ -72,7 +74,7 @@ method encode_sentences(
         my @coded;
         for my $word (@{ $sent })
         {
-            if(not exists $vocab{ $word })
+            if(not exists $vocab->{ $word })
             {
                 assert($new_vocab, "Unknown token: $word");
                 if($idx == $invalid_label)
@@ -82,7 +84,7 @@ method encode_sentences(
                 $vocab->{$word} = $idx;
                 $idx += 1;
             }
-            push @coded, $vocab{ $word };
+            push @coded, $vocab->{ $word };
         }
         push @res, \@coded;
     }
@@ -134,7 +136,7 @@ package AI::MXNet::BucketSentenceIter;
 
 use Mouse;
 use AI::MXNet::Base;
-use List::Util qw(shuffle);
+use List::Util qw(shuffle max);
 extends 'AI::MXNet::DataIter';
 has 'sentences'     => (is => 'ro', isa => 'ArrayRef[ArrayRef]', required => 1);
 has '+batch_size'   => (is => 'ro', isa => 'Int',                required => 1);
@@ -159,7 +161,7 @@ sub BUILD
         my $p = pdl([map { scalar(@$_) } @{ $self->sentences }]);
         enumerate(sub {
             my ($i, $j) = @_;
-            if($j >= $self->bucket_size)
+            if($j >= $self->batch_size)
             {
                 push @buckets, $i;
             }
@@ -243,7 +245,7 @@ method reset()
     $self->ndlabel([]);
     for my $buck (@{ $self->data })
     {
-        $buck = cat(shuffle(dog($buck)));
+        $buck = pdl_shuffle($buck);
         my $label = $buck->zeros;
         $label->slice([0, -2], 'X')  .= $buck->slice([1, -1], 'X');
         $label->slice([-1, -1], 'X') .= $self->invalid_label;

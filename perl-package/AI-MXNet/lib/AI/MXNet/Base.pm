@@ -10,8 +10,10 @@ use Time::HiRes;
 use Carp;
 use Exporter;
 use base qw(Exporter);
+use List::Util qw(shuffle);
+
 @AI::MXNet::Base::EXPORT = qw(product enumerate assert zip check_call build_param_doc 
-                              pdl cat dog svd bisect_left
+                              pdl cat dog svd bisect_left pdl_shuffle
                               DTYPE_STR_TO_MX DTYPE_MX_TO_STR DTYPE_MX_TO_PDL
                               DTYPE_PDL_TO_MX DTYPE_MX_TO_PERL);
 @AI::MXNet::Base::EXPORT_OK = qw(pzeros pceil);
@@ -143,6 +145,30 @@ sub bisect_left
     return $lo;
 }
 
+=head2 pdl_shuffle
+    
+    Shuffle pdl by last dimension
+
+    Parameters
+    -----------
+    PDL $pdl
+    $preshuffle Maybe[ArrayRef[Index]], if defined the array elements are used
+    as shuffled last dimension's indexes
+=cut
+
+
+sub pdl_shuffle
+{
+    my ($pdl, $preshuffle) = @_;
+    my $c = $pdl->copy;
+    my @shuffle = $preshuffle ? @{ $preshuffle } : shuffle(0..$pdl->dim(-1)-1);
+    my $rem = $pdl->ndims-1;
+    for my $i (0..$pdl->dim(-1)-1)
+    {
+        $c->slice(('X')x$rem, $i) .= $pdl->slice(('X')x$rem, $shuffle[$i])
+    }
+    $c;
+}
 
 =head2 assert
 

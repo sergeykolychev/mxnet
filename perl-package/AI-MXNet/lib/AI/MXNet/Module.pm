@@ -184,7 +184,7 @@ func _update_params(
     - parameters will be loaded from ``prefix-epoch.params``.
 =cut
 
-func load_checkpoint(Str $prefix, Int $epoch)
+method load_checkpoint(Str $prefix, Int $epoch)
 {
     my $symbol = AI::MXNet::Symbol->load("$prefix-symbol.json");
     my %save_dict = %{ AI::MXNet::NDArray->load(sprintf('%s-%04d.params', $prefix, $epoch)) };
@@ -236,9 +236,9 @@ extends 'AI::MXNet::Module::Base';
 has '_symbol'           => (is => 'ro', init_arg => 'symbol', isa => 'AI::MXNet::Symbol', required => 1);
 has '_data_names'       => (is => 'ro', init_arg => 'data_names', isa => 'ArrayRef[Str]');
 has '_label_names'      => (is => 'ro', init_arg => 'label_names', isa => 'Maybe[ArrayRef[Str]]');
-has 'work_load_list'    => (is => 'rw', isa => 'ArrayRef[Int]');
-has 'fixed_param_names' => (is => 'rw', isa => 'ArrayRef[Str]');
-has 'state_names'       => (is => 'rw', isa => 'ArrayRef[Str]');
+has 'work_load_list'    => (is => 'rw', isa => 'Maybe[ArrayRef[Int]]');
+has 'fixed_param_names' => (is => 'rw', isa => 'Maybe[ArrayRef[Str]]');
+has 'state_names'       => (is => 'rw', isa => 'Maybe[ArrayRef[Str]]');
 has 'logger'            => (is => 'ro', default => sub { AI::MXNet::Logging->get_logger });
 has '_p'                => (is => 'rw', init_arg => undef);
 has 'context'           => (
@@ -332,7 +332,7 @@ method load(
     %kwargs
 )
 {
-    my ($sym, $args, $auxs) = load_checkpoint($prefix, $epoch);
+    my ($sym, $args, $auxs) = __PACKAGE__->load_checkpoint($prefix, $epoch);
     my $mod = $self->new(symbol => $sym, %kwargs);
     $mod->_p->_arg_params($args);
     $mod->_p->_aux_params($auxs);

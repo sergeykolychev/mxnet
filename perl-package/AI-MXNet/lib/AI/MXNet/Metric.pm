@@ -356,6 +356,12 @@ use AI::MXNet::Base;
 extends 'AI::MXNet::EvalMetric';
 has '+name'        => (default => 'Perplexity');
 has 'ignore_label' => (is => 'ro', isa => 'Maybe[Int]');
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    return $class->$orig(ignore_label => $_[0]) if @_ == 1;
+    return $class->$orig(@_);
+};
 
 =head1 NAME
 
@@ -384,9 +390,9 @@ method update(ArrayRef[AI::MXNet::NDArray] $labels, ArrayRef[AI::MXNet::NDArray]
         my $pred_shape  = $pred->shape;
         assert(
             (product(@{ $label_shape }) == product(@{ $pred_shape })/$pred_shape->[-1]),
-            "shape mismatch: (@$label_shape) vs. ($pred_shape)"
+            "shape mismatch: (@$label_shape) vs. (@$pred_shape)"
         );
-        $label = $label->as_in_context($pred->context)->astype(dtype=>'int32')->reshape([$label->size]);
+        $label = $label->as_in_context($pred->context)->astype('int32')->reshape([$label->size]);
         $pred = AI::MXNet::NDArray->batch_take($pred, $label);
         push @{ $probs }, $pred;
     }, $labels, $preds);
@@ -491,6 +497,12 @@ use AI::MXNet::Base;
 extends 'AI::MXNet::EvalMetric';
 has '+name'   => (default => 'cross-entropy');
 has 'eps'     => (is => 'ro', isa => 'Num', default => 1e-8);
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    return $class->$orig(eps => $_[0]) if @_ == 1;
+    return $class->$orig(@_);
+};
 
 method update(ArrayRef[AI::MXNet::NDArray] $labels, ArrayRef[AI::MXNet::NDArray] $preds)
 {
@@ -532,7 +544,7 @@ package AI::MXNet::CustomMetric;
 use Mouse;
 use AI::MXNet::Base;
 extends 'AI::MXNet::EvalMetric';
-has 'eval_function' => (is => 'ro', isa => 'CodeRef');
+has 'eval_function'       => (is => 'ro', isa => 'CodeRef');
 has 'allow_extra_outputs' => (is => 'ro', isa => 'Int', default => 0);
 
 method update(ArrayRef[AI::MXNet::NDArray] $labels, ArrayRef[AI::MXNet::NDArray] $preds)
@@ -604,6 +616,16 @@ method create(Metric|ArrayRef[Metric] $metric, %kwargs)
             Carp::confess("Metric must be either subref or one of [@metrics]");
         }
         return $metrics{ lc($metric) }->new(%kwargs);
+    }
+}
+
+{
+    no strict 'refs';
+    no warnings 'redefine';
+    for my $metric (values %metrics)
+    {
+        my ($name) = $metric =~ /(\w+)$/;
+        *{__PACKAGE__."::$name"} = sub { shift; $metric->new(@_); };
     }
 }
 

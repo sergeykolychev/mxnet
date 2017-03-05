@@ -123,9 +123,7 @@ method _init_ndarray_module()
         my $function = _make_ndarray_function($handle, $name);
         {
             no strict 'refs';
-            {
-                *{__PACKAGE__."::$name"} = $function;
-            }
+            *{__PACKAGE__."::$name"} = $function;
         }
     }
 }
