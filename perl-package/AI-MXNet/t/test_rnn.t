@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use AI::MXNet qw(mx);
 use PDL;
-use Test::More tests => 28;
+use Test::More tests => 31;
 use Data::Dumper;
 
 sub test_rnn
@@ -19,6 +19,17 @@ sub test_rnn
 sub test_lstm
 {
     my $cell = mx->rnn->LSTMCell(100, prefix=>'rnn_');
+    my($outputs) = $cell->unroll(3, input_prefix=>'rnn_');
+    $outputs = mx->sym->Group($outputs);
+    is_deeply([sort keys %{$cell->params->_params}], ['rnn_h2h_bias', 'rnn_h2h_weight', 'rnn_i2h_bias', 'rnn_i2h_weight']);
+    is_deeply($outputs->list_outputs(), ['rnn_t0_out_output', 'rnn_t1_out_output', 'rnn_t2_out_output']);
+    my (undef, $outs, undef) = $outputs->infer_shape(rnn_t0_data=>[10,50], rnn_t1_data=>[10,50], rnn_t2_data=>[10,50]);
+    is_deeply($outs, [[10, 100], [10, 100], [10, 100]]);
+}
+
+sub test_gru
+{
+    my $cell = mx->rnn->GRUCell(100, prefix=>'rnn_');
     my($outputs) = $cell->unroll(3, input_prefix=>'rnn_');
     $outputs = mx->sym->Group($outputs);
     is_deeply([sort keys %{$cell->params->_params}], ['rnn_h2h_bias', 'rnn_h2h_weight', 'rnn_i2h_bias', 'rnn_i2h_weight']);
@@ -51,4 +62,5 @@ sub test_stack
 
 test_rnn();
 test_lstm();
+test_gru();
 test_stack();

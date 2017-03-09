@@ -675,6 +675,179 @@ method call(AI::MXNet::Symbol $inputs, SymbolOrArrayOfSymbols $states)
 
 }
 
+package AI::MXNet::RNN::GRUCell;
+use Mouse;
+use AI::MXNet::Base;
+extends 'AI::MXNet::RNN::Cell';
+
+=head1 NAME
+
+    AI::MXNet::RNN::GRUCell
+=cut
+
+=head1 DESCRIPTION
+
+    Gated Rectified Unit (GRU) network cell.
+    Note: this is an implementation of the cuDNN version of GRUs
+    (slight modification compared to Cho et al. 2014).
+
+    Parameters
+    ----------
+    num_hidden : int
+        number of units in output symbol
+    prefix : str, default 'gru_'
+        prefix for name of layers
+        (and name of weight if params is undef)
+    params : AI::MXNet::RNN::Params or undef
+        container for weight sharing between cells.
+        created if None.
+=cut
+
+has '+_prefix'     => (default => 'gru_');
+
+=head2 unpack_weights
+
+        Unpack fused weight matrices into separate
+        weight matrices
+
+        Parameters
+        ----------
+        args : hashref of str -> NDArray
+            dictionary containing packed weights.
+            usually from $Module->get_output()
+
+        Returns
+        -------
+        args : hashref of str -> NDArray
+            dictionary with weights associated to
+            this cell unpacked.
+=cut
+
+method unpack_weights(HashRef[AI::MXNet::NDArray] $args)
+{
+    $args = { %{ $args } };
+    my $h = $self->_num_hidden;
+    my $outs = ['_z', '_r', '_o'];
+    for my $i ('i2h', 'h2h')
+    {
+        my $weight = delete $args->{ sprintf('%s%s_weight', $self->_prefix, $i) };
+        my $bias   = delete $args->{ sprintf('%s%s_bias', $self->_prefix, $i) };
+        enumerate(sub {
+            my ($j, $name) = @_;
+            my $wname = sprintf('%s%s%s_weight', $self->_prefix, $i, $name);
+            $args->{$wname} = $weight->slice([$j*$h,($j+1)*$h-1])->copy;
+            my $bname = sprintf('%s%s%s_bias', $self->_prefix, $i, $name);
+            $args->{$bname} = $bias->slice([$j*$h,($j+1)*$h-1])->copy;
+        }, $outs);
+    }
+    return $args;
+}
+
+=head2 pack_weights
+
+        Pack separate weight matrices into fused
+        weight.
+
+        Parameters
+        ----------
+        args : hashref of str -> NDArray
+            dictionary containing unpacked weights.
+
+        Returns
+        -------
+        args : hashref of str -> NDArray
+            dictionary with weights associated to
+            this cell packed.
+=cut
+
+
+method pack_weights(HashRef[AI::MXNet::NDArray] $args)
+{
+    $args = { %{ $args } };
+    my @ins = ('_z', '_r', '_o');
+    for my $i ('i2h', 'h2h')
+    {
+        my @weight;
+        my @bias;
+        for my $name (@ins)
+        {
+            my $wname = sprintf('%s%s%s_weight', $self->_prefix, $i, $name);
+            push @weight, delete $args->{$wname};
+            my $bname = sprintf('%s%s%s_bias', $self->_prefix, $i, $name);
+            push @bias, delete $args->{$bname};
+        }
+        $args->{ sprintf('%s%s_weight', $self->_prefix, $i) } = AI::MXNet::NDArray->concatenate(
+            \@weight
+        );
+        $args->{ sprintf('%s%s_bias', $self->_prefix, $i) } = AI::MXNet::NDArray->concatenate(
+            \@bias
+        );
+    }
+    return $args;
+}
+
+=head2 call
+
+        Construct symbol for one step of RNN.
+
+        Parameters
+        ----------
+        inputs : sym.Variable
+            input symbol, 2D, batch * num_units
+        states : sym.Variable
+            state from previous step or begin_state().
+
+        Returns
+        -------
+        output : Symbol
+            output symbol
+        states : Symbol
+            state to next step of RNN.
+=cut
+
+method call(AI::MXNet::Symbol $inputs, SymbolOrArrayOfSymbols $states)
+{
+    $self->_counter($self->_counter + 1);
+    my $name = sprintf('%st%d_', $self->_prefix, $self->_counter);
+    my $prev_state_h = @{ $states }[0];
+    my $i2h = AI::MXNet::Symbol->FullyConnected(
+        data       => $inputs,
+        weight     => $self->_iW,
+        bias       => $self->_iB,
+        num_hidden => $self->_num_hidden*3,
+        name       => "${name}i2h"
+    );
+    my $h2h = AI::MXNet::Symbol->FullyConnected(
+        data       => $prev_state_h,
+        weight     => $self->_hW,
+        bias       => $self->_hB,
+        num_hidden => $self->_num_hidden*3,
+        name       => "${name}h2h"
+    );
+    my ($i2h_z, $i2h_r);
+    ($i2h_z, $i2h_r, $i2h) = @{ AI::MXNet::Symbol->SliceChannel(
+        $i2h, num_outputs => 3, name => "${name}_i2h_slice"
+    ) };
+    my ($h2h_z, $h2h_r);
+    ($h2h_z, $h2h_r, $h2h) = @{ AI::MXNet::Symbol->SliceChannel(
+        $h2h, num_outputs => 3, name => "${name}_h2h_slice"
+    ) };
+    my $update_gate = AI::MXNet::Symbol->Activation(
+        $i2h_z + $h2h_z, act_type => "sigmoid", name => "${name}_z_act"
+    );
+    my $reset_gate = AI::MXNet::Symbol->Activation(
+        $i2h_r + $h2h_r, act_type => "sigmoid", name => "${name}_r_act"
+    );
+    my $next_h_tmp = AI::MXNet::Symbol->Activation(
+        $i2h + $reset_gate * $h2h, act_type => "tanh", name => "${name}_h_act"
+    );
+    my $next_h = AI::MXNet::Symbol->_plus(
+        (1 - $update_gate) * $next_h_tmp, $update_gate * $prev_state_h,
+        name => "${name}out"
+    );
+    return ($next_h, [$next_h])
+}
+
 package AI::MXNet::RNN::FusedCell;
 use Mouse;
 use AI::MXNet::Types;

@@ -142,6 +142,7 @@ method do_rnn_checkpoint(
 ## In order to closely resemble the Python's usage
 method RNNCell(@args)            { AI::MXNet::RNN::Cell->new(@args % 2 ? ('num_hidden', @args) : @args) }
 method LSTMCell(@args)           { AI::MXNet::RNN::LSTMCell->new(@args % 2 ? ('num_hidden', @args) : @args) }
+method GRUCell(@args)            { AI::MXNet::RNN::GRUCell->new(@args % 2 ? ('num_hidden', @args) : @args) }
 method SequentialRNNCell(@args)  { AI::MXNet::RNN::SequentialCell->new(@args) }
 method encode_sentences(@args)   { AI::MXNet::RNN::IO->encode_sentences(@args) }
 method BucketSentenceIter(@args)
