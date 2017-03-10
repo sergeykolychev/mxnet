@@ -18,7 +18,7 @@ GetOptions(
     'optimizer=s'    => \(my $optimizer    = 'adam'   ),
     'mom=f'          => \(my $mom          = 0       ),
     'wd=f'           => \(my $wd           = 0.00001 ),
-    'batch_size'     => \(my $batch_size   = 32      ),
+    'batch-size=i'   => \(my $batch_size   = 32      ),
     'disp-batches=i' => \(my $disp_batches = 50      ),
     'chkp-prefix=s'  => \(my $chkp_prefix  = 'lstm_' ),
     'chkp-epoch=i'   => \(my $chkp_epoch   = 0       ),
