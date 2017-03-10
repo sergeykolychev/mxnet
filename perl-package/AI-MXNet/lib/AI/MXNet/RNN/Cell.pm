@@ -1001,7 +1001,7 @@ method _slice_weights($arr, $li, $lh)
 method unpack_weights(HashRef[AI::MXNet::NDArray] $args)
 {
     my %args = %{ $args };
-    my $arr = delete $args->{ $self->_parameter->name };
+    my $arr = delete $args{ $self->_parameter->name };
     my $b = $self->_directions;
     my $m = $self->_num_weights;
     my $h = $self->_num_hidden;

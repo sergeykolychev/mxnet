@@ -686,10 +686,12 @@ method _init_weight($name, $arr)
     for my $name (keys %{ $args })
     {
        my $desc = AI::MXNet::InitDesc->new(name => $name);
-       &{$self->init}($desc, $args->{name});
+       &{$self->init}($desc, $args->{$name});
     }
 
     $arr .= $cell->pack_weights($args)->{parameters};
 }
+
+__PACKAGE__->register;
 
 1;

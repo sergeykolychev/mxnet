@@ -139,7 +139,7 @@ my $train = sub
     };
 
     my $contexts;
-    if($gpus)
+    if(defined $gpus)
     {
         $contexts = [map { mx->gpu($_) } split(/,/, $gpus)];
     }
@@ -181,7 +181,7 @@ my $train = sub
 
 my $test = sub {
     assert($model_prefix, "Must specifiy path to load from");
-    my (undef, $data_val, $vocab) = get_data('TN');
+    my (undef, $data_val, $vocab) = get_data('NT');
     my $stack = mx->rnn->SequentialRNNCell();
     for my $i (0..$num_layers-1)
     {
@@ -231,7 +231,7 @@ my $test = sub {
         for_training => 0,
         force_rebind => 0
     );
-    $model->set_params($arg_params, $aux_params, allow_missing => 1);
+    $model->set_params($arg_params, $aux_params);
     my $score = $model->score($data_val,
         mx->metric->Perplexity($invalid_label),
         batch_end_callback=>mx->callback->Speedometer($batch_size, 5)

@@ -163,7 +163,7 @@ $label    = mx->sym->Reshape($label, shape => [-1]);
 my $net   = mx->sym->SoftmaxOutput(data => $pred, label => $label, name => 'softmax');
 
 my $contexts;
-if($gpus)
+if(defined $gpus)
 {
     $contexts = [map { mx->gpu($_) } split(/,/, $gpus)];
 }
