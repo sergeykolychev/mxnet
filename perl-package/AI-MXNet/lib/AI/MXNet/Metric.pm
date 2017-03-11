@@ -50,7 +50,12 @@ func check_label_shapes(
 
 package AI::MXNet::EvalMetric;
 use Mouse;
-
+use overload '""' => sub {
+    return "EvalMetric: "
+            .Data::Dumper->new(
+                [shift->get_name_value()]
+            )->Purity(1)->Deepcopy(1)->Terse(1)->Dump
+},  fallback => 1;
 has 'name'       => (is => 'rw', isa => 'Str');
 has 'num'        => (is => 'rw', isa => 'Int');
 has 'num_inst'   => (is => 'rw', isa => 'Maybe[Int|ArrayRef[Int]]');
