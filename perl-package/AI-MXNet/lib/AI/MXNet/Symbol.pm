@@ -780,12 +780,13 @@ method _get_ndarray_inputs(
 
 method simple_bind(
             AI::MXNet::Context                 :$ctx=AI::MXNet::Context->current_ctx,
-            HashRef[Shape]                     :$shapes,
+            Maybe[HashRef[Shape]]              :$shapes=,
             Str|HashRef[Str]                   :$grad_req='write',
             Maybe[HashRef[Dtype]]              :$type_dict=,
             Maybe[HashRef[AI::MXNet::Context]] :$group2ctx=
 )
 {
+    $shapes //= {};
     if(not defined $type_dict)
     {
         $type_dict =  {};
@@ -811,7 +812,7 @@ method simple_bind(
     confess("Input node is not complete") 
         unless $arg_shapes and $arg_types;
 
-    my ($arg_ctx, $aux_ctx) = ([], []); 
+    my ($arg_ctx, $aux_ctx) = ([], []);
     if(defined $group2ctx)
     {
         my $attr_dict = $self->attr_dict();
@@ -1025,7 +1026,7 @@ method bind(
 
     if(defined $group2ctx)
     {
-        for (my ($key, $val) = each %{ $group2ctx })
+        while(my ($key, $val) = each %{ $group2ctx })
         {
             push @{ $ctx_map_keys } , $key;
             push @{ $ctx_map_dev_types }, $val->device_type_id;

@@ -59,6 +59,8 @@ sub import
             sub AttrScope { shift; AI::MXNet::Symbol::AttrScope->new(\@_) }
             *AI::MXNet::Symbol::AttrScope::current = sub { \$${short_name}::AttrScope; };
             \$${short_name}::AttrScope = AI::MXNet::Symbol::AttrScope->new;
+            *AI::MXNet::Context::current_ctx = sub { \$${short_name}::Context; };
+            \$${short_name}::Context = AI::MXNet::Context->new(device_type => 'cpu', device_id => 0);
             1;
 EOP
             eval $short_name_package;
