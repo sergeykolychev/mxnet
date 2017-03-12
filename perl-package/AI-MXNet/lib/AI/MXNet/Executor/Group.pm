@@ -100,7 +100,15 @@ func _merge_multi_context($outputs, $major_axis)
         my ($tensors, $axis) = @_;
         if($axis >= 0)
         {
-            push @rets, AI::MXNet::NDArray->concatenate($tensors, axis => $axis, always_copy => 0);
+            if(@$tensors == 1)
+            {
+                push @rets, $tensors->[0];
+            }
+            else
+            {
+                my $ctx = $tensors->[0]->context;
+                push @rets, AI::MXNet::NDArray->concat(map { $_->as_in_context($ctx) } @$tensors, { dim => $axis });
+            }
         }
         else
         {
