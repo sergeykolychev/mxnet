@@ -3,7 +3,6 @@ use warnings;
 use AI::MXNet qw(mx);
 use PDL;
 use Test::More tests => 31;
-use Data::Dumper;
 
 sub test_rnn
 {

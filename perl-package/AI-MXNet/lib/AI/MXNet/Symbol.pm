@@ -304,7 +304,9 @@ method list_attr()
     my @attrs = @{ check_call(AI::MXNetCAPI::SymbolListAttrShallow($self->handle)) };
     while(@attrs)
     {
-        $ret{ shift(@attrs) } = shift(@attrs);
+        my $k = shift(@attrs);
+        my $v = shift(@attrs);
+        $ret{ $k } = $v;
     }
     return \%ret;
 }
@@ -960,7 +962,7 @@ method bind(
         AI::MXNet::Context                                              :$ctx,
         HashRef[AI::MXNet::NDArray]|ArrayRef[AI::MXNet::NDArray]        :$args,
         Maybe[HashRef[AI::MXNet::NDArray]|ArrayRef[AI::MXNet::NDArray]] :$args_grad=,
-        Str|HashRef[Str]|ArrayRef[Str]                                  :$grad_req=,
+        Str|HashRef[Str]|ArrayRef[Str]                                  :$grad_req='write',
         Maybe[HashRef[AI::MXNet::NDArray]|ArrayRef[AI::MXNet::NDArray]] :$aux_states=,
         Maybe[HashRef[AI::MXNet::Context]]                              :$group2ctx=,
         Maybe[AI::MXNet::Executor]                                      :$shared_exec=

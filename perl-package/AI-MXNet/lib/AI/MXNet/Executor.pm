@@ -448,13 +448,13 @@ method reshape(HashRef[Shape] $kwargs, Int $partial_shaping=0, Int $allow_up_siz
             $darr = $self->grad_arrays->[$i];
         }
         if(
-            $partial_shaping 
+            $partial_shaping
                 or
-            exists $kwargs->{ $name } 
-                or 
+            exists $kwargs->{ $name }
+                or
             join(',', @{ $new_shape }) eq join(',', @{ $arr->shape })
         )
-        { 
+        {
             if(AI::MXNet::NDArray->size($new_shape) > $arr->size)
             {
                 confess(
@@ -500,7 +500,7 @@ method reshape(HashRef[Shape] $kwargs, Int $partial_shaping=0, Int $allow_up_siz
     }
     my %new_aux_dict;
     $i = 0;
-    for my $name ($self->_symbol->list_auxiliary_states())
+    for my $name (@{ $self->_symbol->list_auxiliary_states() })
     {
         my $new_shape = $aux_shapes->[$i];
         my $arr = $self->aux_arrays->[$i];
@@ -516,7 +516,7 @@ method reshape(HashRef[Shape] $kwargs, Int $partial_shaping=0, Int $allow_up_siz
                     ."to enable allocation of new arrays."
                 ) unless $allow_up_sizing;
                 $new_aux_dict{ $name }  = AI::MXNet::NDArray->empty(
-                    $new_shape, 
+                    $new_shape,
                     ctx => $arr->context,
                     dtype => $arr->dtype
                 );
@@ -538,13 +538,13 @@ method reshape(HashRef[Shape] $kwargs, Int $partial_shaping=0, Int $allow_up_siz
         $i++;
     }
     return $self->_symbol->bind(
-                $self->_ctx,
-                \%new_arg_dict,
-                \%new_grad_dict,
-                $self->_grad_req,
-                \%new_aux_dict,
-                $self->_group2ctx,
-                $self
+                ctx         => $self->_ctx,
+                args        => \%new_arg_dict,
+                args_grad   => \%new_grad_dict,
+                grad_req    => $self->_grad_req,
+                aux_states  => \%new_aux_dict,
+                group2ctx   => $self->_group2ctx,
+                shared_exec => $self
     );
 }
 

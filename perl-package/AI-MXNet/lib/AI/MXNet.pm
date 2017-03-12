@@ -36,6 +36,7 @@ sub import
         {
             my $short_name_package =<<"EOP";
             package $short_name;
+            no warnings 'redefine';
             sub nd { 'AI::MXNet::NDArray' }
             sub sym { 'AI::MXNet::Symbol' }
             sub symbol { 'AI::MXNet::Symbol' }
@@ -45,6 +46,7 @@ sub import
             sub opt { 'AI::MXNet::Optimizer' }
             sub rnd { 'AI::MXNet::Random' }
             sub random { 'AI::MXNet::Random' }
+            sub Context { shift; AI::MXNet::Context->new(\@_) }
             sub cpu { AI::MXNet::Context->cpu(\$_[1]//0) }
             sub gpu { AI::MXNet::Context->gpu(\$_[1]//0) }
             sub kv { 'AI::MXNet::KVStore' }
@@ -54,6 +56,9 @@ sub import
             sub viz { 'AI::MXNet::Visualization' }
             sub rnn { 'AI::MXNet::RNN' }
             sub callback { 'AI::MXNet::Callback' }
+            sub AttrScope { shift; AI::MXNet::Symbol::AttrScope->new(\@_) }
+            *AI::MXNet::Symbol::AttrScope::current = sub { \$${short_name}::AttrScope; };
+            \$${short_name}::AttrScope = AI::MXNet::Symbol::AttrScope->new;
             1;
 EOP
             eval $short_name_package;

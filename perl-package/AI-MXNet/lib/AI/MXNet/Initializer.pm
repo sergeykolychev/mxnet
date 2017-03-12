@@ -101,7 +101,6 @@ method register()
         arr : NDArray
             ndarray to be Initialized
 =cut
-use Data::Dumper;
 method call(Str|AI::MXNet::InitDesc $desc, AI::MXNet::NDArray $arr)
 {
     return $self->_legacy_init($desc, $arr) unless blessed $desc;

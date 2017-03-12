@@ -94,7 +94,7 @@ func _initialize_kvstore(
         $kvstore->init($idx, $arg_params->{ $param_names->[$idx] });
         if($update_on_kvstore)
         {
-            $kvstore->pull($idx, $param_on_devs, priority => -$idx);
+            $kvstore->pull($idx, out => $param_on_devs, priority => -$idx);
         }
     }, $param_arrays);
 }
@@ -119,7 +119,7 @@ method _update_params_on_kvstore(
         # push gradient, priority is negative index
         $kvstore->push($index, $grad_list, priority => -$index);
         # pull back the weights
-        $kvstore->pull($index, $arg_list, priority  => -$index);
+        $kvstore->pull($index, out => $arg_list, priority  => -$index);
     }, $param_arrays, $grad_arrays);
 }
 
@@ -146,7 +146,7 @@ func _update_params(
             # push gradient, priority is negative index
             $kvstore->push($index, $grad_list, priority => -$index);
             # pull back the sum gradients, to the same locations.
-            $kvstore->pull($index, $grad_list, priority => -$index);
+            $kvstore->pull($index, out => $grad_list, priority => -$index);
         }
         enumerate(sub {
             my ($k, $w, $g) = @_;

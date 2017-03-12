@@ -60,21 +60,13 @@ sub DEMOLISH
 
 method init(
     Int|ArrayRef[Int] $key,
-    AI::MXNet::NDArray|ArrayRef[AI::MXNet::NDArray] $value
+    AI::MXNet::NDArray|ArrayRef[AI::MXNet::NDArray]|ArrayRef[ArrayRef[AI::MXNet::NDArray]] $value
 )
 {
-    if(not ref $key)
-    {
-        $key = [$key];
-    }
-    if(ref $value ne 'ARRAY')
-    {
-        $value = [$value];
-    }
-    @{ $value } = map { $_->handle } @{ $value };
+    my ($keys, $vals) = _key_value($key, $value);
     check_call(
         AI::MXNetCAPI::KVStoreInit(
-            $self->handle, scalar(@{ $key }), $key, $value
+            $self->handle, scalar(@{ $keys }), $keys, $vals
         )
     );
 }
@@ -144,24 +136,14 @@ method init(
 
 method push(
     Int|ArrayRef[Int] $key,
-    AI::MXNet::NDArray|ArrayRef[AI::MXNet::NDArray] $value,
+    AI::MXNet::NDArray|ArrayRef[AI::MXNet::NDArray]|ArrayRef[ArrayRef[AI::MXNet::NDArray]] $value,
     Int :$priority=0
 )
 {
-    if(not ref $key)
-    {
-        $key = [$key];
-    }
-    if(ref $value ne 'ARRAY')
-    {
-        $value = [$value];
-    }
-    @{ $value } = map { $_->handle } @{ $value };
-
-
+    my ($keys, $vals) = _key_value($key, $value);
     check_call(
         AI::MXNetCAPI::KVStorePush(
-            $self->handle, scalar(@{ $key }), $key, $value, $priority
+            $self->handle, scalar(@{ $keys }), $keys, $vals, $priority
         )
     );
 }
@@ -227,22 +209,14 @@ method push(
 
 method pull(
     Int|ArrayRef[Int] $key,
-    AI::MXNet::NDArray|ArrayRef[AI::MXNet::NDArray] $out,
+    AI::MXNet::NDArray|ArrayRef[AI::MXNet::NDArray]|ArrayRef[ArrayRef[AI::MXNet::NDArray]] :$out,
     Int :$priority=0
 )
 {
-    if(not ref $key)
-    {
-        $key = [$key];
-    }
-    if(ref $out ne 'ARRAY')
-    {
-        $out = [$out];
-    }
-    @{ $out } = map { $_->handle } @{ $out };
+    my ($keys, $vals) = _key_value($key, $out);
     check_call(
         AI::MXNetCAPI::KVStorePull(
-            $self->handle, scalar(@{ $key }), $key, $out, $priority
+            $self->handle, scalar(@{ $keys }), $keys, $vals, $priority
         )
     );
 }
@@ -475,6 +449,39 @@ method create(Str $name='local')
 {
     my $handle = check_call(AI::MXNetCAPI::KVStoreCreate($name));
     return __PACKAGE__->new(handle => $handle);
+}
+
+sub _key_value
+{
+    my ($keys, $vals) = @_;
+    if(not ref $keys)
+    {
+        if(blessed $vals)
+        {
+            return ([$keys], [$vals->handle]);
+        }
+        else
+        {
+            for my $value (@{ $vals })
+            {
+                assert(blessed($value) and $value->isa('AI::MXNet::NDArray'));
+                return ([($keys)x@$vals], [map { $_->handle } @$vals]);
+            }
+        }
+    }
+    else
+    {
+        assert(not blessed($vals) and @$keys == @$vals);
+        my @c_keys;
+        my @c_vals;
+        zip(sub {
+            my ($key, $val) = @_;
+            my ($c_key, $c_val) = _key_value($key, $val);
+            push @c_keys, @$c_key;
+            push @c_vals, @$c_val;
+        }, $keys, $vals);
+        return (\@c_keys, \@c_vals);
+    }
 }
 
 1;

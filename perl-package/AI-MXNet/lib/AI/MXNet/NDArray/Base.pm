@@ -88,7 +88,7 @@ func _make_ndarray_function($handle, $func_name)
         }
         for my $key (keys %kwargs)
         {
-            $kwargs{ $key } = "(" .join(",", @{ $kwargs{ $key } }) .")" 
+            $kwargs{ $key } = "(" .join(", ", @{ $kwargs{ $key } }) .")" 
                 if ref $kwargs{ $key } eq 'ARRAY';
         }
         my $out = check_call(AI::MXNetCAPI::ImperativeInvoke(

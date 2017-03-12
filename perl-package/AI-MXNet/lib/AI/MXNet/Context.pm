@@ -6,6 +6,12 @@ use AI::MXNet::Types;
 use AI::MXNet::Function::Parameters;
 use constant devtype2str => { 1 => 'cpu', 2 => 'gpu', 3 => 'cpu_pinned' };
 use constant devstr2type => { cpu => 1, gpu => 2, cpu_pinned => 3 };
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    return $class->$orig(device_type => $_[0]) if @_ == 1;
+    return $class->$orig(@_);
+};
 
 has 'device_type' => (
     is => 'rw',
@@ -13,7 +19,7 @@ has 'device_type' => (
     default => 'cpu'
 );
 
-has 'device_type_id' => (  
+has 'device_type_id' => (
     is => 'rw',
     isa => enum([1, 2, 3]),
     default => sub { devstr2type->{ shift->device_type } },
@@ -27,7 +33,7 @@ has 'device_id' => (
 );
 
 use overload
-    '==' => sub { 
+    '==' => sub {
         my ($self, $other) = @_;
         return 0 unless blessed($other) and $other->isa(__PACKAGE__);
         return "$self" eq "$other";

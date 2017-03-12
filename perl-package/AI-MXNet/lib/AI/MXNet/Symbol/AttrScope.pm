@@ -3,8 +3,14 @@ use strict;
 use warnings;
 use Mouse;
 use AI::MXNet::Function::Parameters;
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    return $class->$orig(attr => {@_});
+};
 
-=head1 
+
+=head1
 
     Attribute manager for scoping.
 
@@ -19,7 +25,6 @@ use AI::MXNet::Function::Parameters;
 has 'attr' => (
     is => 'ro',
     isa => 'HashRef[Str]',
-    default => sub { +{} }
 );
 
 =head2 current
@@ -37,7 +42,7 @@ has 'attr' => (
 
 method current()
 {
-    $AI::MXNet::curr_attr_scope; 
+    $AI::MXNet::curr_attr_scope;
 }
 
 =head2 get
@@ -54,10 +59,10 @@ method current()
         attr : dict of string to string
             Updated attributes to add other scope related attributes.
 =cut
- 
+
 method get(HashRef[Str]|Undef $attr=)
 {
-    return bless($attr//{}, 'AI::MXNet::Util::Printable') unless %{ $self->attr }; 
+    return bless($attr//{}, 'AI::MXNet::Util::Printable') unless %{ $self->attr };
     my %ret = (%{ $self->attr }, %{ $attr//{} });
     return bless (\%ret, 'AI::MXNet::Util::Printable');
 }
