@@ -7,23 +7,24 @@ use AI::MXNet::Base;
 use Getopt::Long qw(HelpMessage);
 
 GetOptions(
-    'test'           => \(my $do_test                ),
-    'num-layers=i'   => \(my $num_layers   = 2       ),
-    'num-hidden=i'   => \(my $num_hidden   = 256     ),
-    'num-embed=i'    => \(my $num_embed    = 256     ),
-    'num-seq=i'      => \(my $seq_size     = 32      ),
-    'gpus=s'         => \(my $gpus                   ),
-    'kv-store=s'     => \(my $kv_store     = 'device'),
-    'num-epoch=i'    => \(my $num_epoch    = 25      ),
-    'lr=f'           => \(my $lr           = 0.01    ),
-    'optimizer=s'    => \(my $optimizer    = 'adam'  ),
-    'mom=f'          => \(my $mom          = 0       ),
-    'wd=f'           => \(my $wd           = 0.00001 ),
-    'batch-size=i'   => \(my $batch_size   = 32      ),
-    'disp-batches=i' => \(my $disp_batches = 50      ),
-    'model-prefix=s' => \(my $model_prefix = 'lstm_' ),
-    'load-epoch=i'   => \(my $load_epoch   = 0       ),
-    'stack-rnn'      => \(my $stack_rnn              ),
+    'test'            => \(my $do_test                ),
+    'num-layers=i'    => \(my $num_layers   = 2       ),
+    'num-hidden=i'    => \(my $num_hidden   = 256     ),
+    'num-embed=i'     => \(my $num_embed    = 256     ),
+    'num-seq=i'       => \(my $seq_size     = 32      ),
+    'gpus=s'          => \(my $gpus                   ),
+    'kv-store=s'      => \(my $kv_store     = 'device'),
+    'num-epoch=i'     => \(my $num_epoch    = 25      ),
+    'lr=f'            => \(my $lr           = 0.01    ),
+    'optimizer=s'     => \(my $optimizer    = 'adam'  ),
+    'mom=f'           => \(my $mom          = 0       ),
+    'wd=f'            => \(my $wd           = 0.00001 ),
+    'batch-size=i'    => \(my $batch_size   = 32      ),
+    'disp-batches=i'  => \(my $disp_batches = 50      ),
+    'model-prefix=s'  => \(my $model_prefix = 'lstm_' ),
+    'load-epoch=i'    => \(my $load_epoch   = 0       ),
+    'stack-rnn'       => \(my $stack_rnn              ),
+    'bidirectional=i' => \(my $bidirectional          ),
     'help'           => sub { HelpMessage(0) },
 ) or HelpMessage(1);
 
@@ -49,8 +50,12 @@ GetOptions(
     --disp-batches   show progress for every n batches, default=50
     --model-prefix   prefix for checkpoint files for loading/saving, default='lstm_'
     --load-epoch     load from epoch
-    --stack-rnn      stack rnn to reduce communication overhead
+    --stack-rnn      stack rnn to reduce communication overhead (1,0 default 0)
+    --bidirectional  whether to use bidirectional layers (1,0 default 0)
 =cut
+
+$bidirectional = $bidirectional ? 1 : 0;
+$stack_rnn     = $stack_rnn     ? 1 : 0;
 
 func tokenize_text($fname, :$vocab=, :$invalid_label=-1, :$start_label=0)
 {
@@ -96,45 +101,39 @@ func get_data($layout)
 my $train = sub
 {
     my ($data_train, $data_val, $vocab) = get_data('TN');
-    my @cells;
     my $cell;
     if($stack_rnn)
     {
+        my $stack = mx->rnn->SequentialRNNCell();
         for my $i (0..$num_layers-1)
         {
-            push @cells, ($cell = mx->rnn->FusedRNNCell($num_hidden, mode => 'lstm', prefix => "fused_rnn$i"));
+            $stack->add(
+                mx->rnn->FusedRNNCell(
+                    $num_hidden, num_layers => 1,
+                    mode => 'lstm', prefix => "fused_rnn$i",
+                    bidirectional => $bidirectional
+                )
+            );
         }
+        $cell = $stack;
     }
     else
     {
-        $cell = mx->rnn->FusedRNNCell($num_hidden, mode => 'lstm', num_layers => $num_layers);
+        $cell = mx->rnn->FusedRNNCell(
+            $num_hidden, mode => 'lstm', num_layers => $num_layers,
+            bidirectional => $bidirectional
+        );
     }
 
     my $sym_gen = sub { my $seq_len = shift;
         my $data = mx->sym->Variable('data');
         my $label = mx->sym->Variable('softmax_label');
         my $embed = mx->sym->Embedding(data=>$data, input_dim=>scalar(keys %$vocab), output_dim=>$num_embed,name=>'embed');
-        my $output;
-        if ($stack_rnn)
-        {
-            $output = $embed;
-            for my $i (0..$num_layers-1)
-            {
-                $cells[$i]->reset;
-                ($output) = $cells[$i]->unroll($seq_len, inputs=>$output, merge_outputs=>1, layout=>'TNC');
-            }
-        }
-        else
-        {
-            $cell->reset;
-            ($output) = $cell->unroll($seq_len, inputs=>$embed, merge_outputs=>1, layout=>'TNC');
-        }
-        my $pred = mx->sym->Reshape($output, shape=>[-1, $num_hidden]);
+        my ($output) = $cell->unroll($seq_len, inputs=>$embed, merge_outputs=>1, layout=>'TNC');
+        my $pred = mx->sym->Reshape($output, shape=>[-1, $num_hidden*(1+$bidirectional)]);
         $pred = mx->sym->FullyConnected(data=>$pred, num_hidden=>scalar(keys %$vocab), name=>'pred');
-
         $label = mx->sym->Reshape($label, shape=>[-1]);
         $pred = mx->sym->SoftmaxOutput(data=>$pred, label=>$label, name=>'softmax');
-
         return ($pred, ['data'], ['softmax_label']);
     };
 
@@ -185,9 +184,20 @@ my $test = sub {
     my $stack = mx->rnn->SequentialRNNCell();
     for my $i (0..$num_layers-1)
     {
-        $stack->add(mx->rnn->LSTMCell(num_hidden => $num_hidden, prefix => "lstm_l${i}_"));
+        my $cell = mx->rnn->LSTMCell(num_hidden => $num_hidden, prefix => "lstm_l${i}_");
+        if($bidirectional)
+        {
+            $cell = mx->rnn->BidirectionalCell(
+                $cell,
+                mx->rnn->LSTMCell(
+                    num_hidden => $num_hidden,
+                    prefix => "lstm_r${i}_"
+                ),
+                output_prefix => "bi_lstm_$i"
+            );
+        }
+        $stack->add($cell);
     }
-
     my $sym_gen = sub {
         my $seq_len = shift;
         my $data  = mx->sym->Variable('data');
@@ -198,7 +208,7 @@ my $test = sub {
         );
         $stack->reset;
         my ($outputs, $states) = $stack->unroll($seq_len, inputs => $embed, merge_outputs => 1);
-        my $pred = mx->sym->Reshape($outputs, shape => [-1, $num_hidden]);
+        my $pred = mx->sym->Reshape($outputs, shape => [-1, $num_hidden*(1+$bidirectional)]);
         $pred    = mx->sym->FullyConnected(data => $pred, num_hidden => scalar(keys %$vocab), name => 'pred');
         $label   = mx->sym->Reshape($label, shape => [-1]);
         $pred    = mx->sym->SoftmaxOutput(data => $pred, label => $label, name => 'softmax');

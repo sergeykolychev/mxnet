@@ -145,6 +145,7 @@ method LSTMCell(@args)           { AI::MXNet::RNN::LSTMCell->new(@args % 2 ? ('n
 method GRUCell(@args)            { AI::MXNet::RNN::GRUCell->new(@args % 2 ? ('num_hidden', @args) : @args) }
 method FusedRNNCell(@args)       { AI::MXNet::RNN::FusedCell->new(@args % 2 ? ('num_hidden', @args) : @args) }
 method SequentialRNNCell(@args)  { AI::MXNet::RNN::SequentialCell->new(@args) }
+method BidirectionalCell(@args)  { AI::MXNet::RNN::BidirectionalCell->new(@args) }
 method encode_sentences(@args)   { AI::MXNet::RNN::IO->encode_sentences(@args) }
 method BucketSentenceIter(@args)
 {

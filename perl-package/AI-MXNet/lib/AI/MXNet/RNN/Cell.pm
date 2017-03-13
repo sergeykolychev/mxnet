@@ -146,6 +146,11 @@ method call(AI::MXNet::Symbol $inputs, AI::MXNet::Symbol|ArrayRef[AI::MXNet::Sym
     confess("Not Implemented");
 }
 
+method _gate_names()
+{
+    [''];
+}
+
 =head2 params
 
         Parameters of this cell
@@ -237,7 +242,21 @@ method begin_state(CodeRef $func=AI::MXNet::Symbol->can('zeros'), @kwargs)
 
 method unpack_weights(HashRef[AI::MXNet::NDArray] $args)
 {
-    return { %{ $args } };
+    my %args = %{ $args };
+    my $h = $self->_num_hidden;
+    for my $group_name ('i2h', 'h2h')
+    {
+        my $weight = delete $args{ sprintf('%s%s_weight', $self->_prefix, $group_name) };
+        my $bias   = delete $args{ sprintf('%s%s_bias', $self->_prefix, $group_name) };
+        enumerate(sub {
+            my ($j, $name) = @_;
+            my $wname = sprintf('%s%s%s_weight', $self->_prefix, $group_name, $name);
+            $args->{$wname} = $weight->slice([$j*$h,($j+1)*$h-1])->copy;
+            my $bname = sprintf('%s%s%s_bias', $self->_prefix, $group_name, $name);
+            $args->{$bname} = $bias->slice([$j*$h,($j+1)*$h-1])->copy;
+        }, $self->_gate_names);
+    }
+    return \%args;
 }
 
 =head2 pack_weights
@@ -259,7 +278,27 @@ method unpack_weights(HashRef[AI::MXNet::NDArray] $args)
 
 method pack_weights(HashRef[AI::MXNet::NDArray] $args)
 {
-    return { %{ $args } };
+    my %args = %{ $args };
+    my $h = $self->_num_hidden;
+    for my $group_name ('i2h', 'h2h')
+    {
+        my @weight;
+        my @bias;
+        for my $name (@{ $self->_gate_names })
+        {
+            my $wname = sprintf('%s%s%s_weight', $self->_prefix, $group_name, $name);
+            push @weight, delete $args{$wname};
+            my $bname = sprintf('%s%s%s_bias', $self->_prefix, $group_name, $name);
+            push @bias, delete $args{$bname};
+        }
+        $args{ sprintf('%s%s_weight', $self->_prefix, $group_name) } = AI::MXNet::NDArray->concatenate(
+            \@weight
+        );
+        $args{ sprintf('%s%s_bias', $self->_prefix, $group_name) } = AI::MXNet::NDArray->concatenate(
+            \@bias
+        );
+    }
+    return \%args;
 }
 
 =head2 unroll
@@ -293,12 +332,12 @@ method pack_weights(HashRef[AI::MXNet::NDArray] $args)
             layout of input symbol. Only used if inputs
             is a single Symbol.
         merge_outputs : bool
-            if 0, return outputs as a list of Symbols.
+            If 0, return outputs as a list of Symbols.
             If 1, concatenate output across time steps
             and return a single symbol with shape
             (batch_size, length, ...) if layout == 'NTC',
             or (length, batch_size, ...) if layout == 'TNC'.
-
+            If undef, output whatever is faster
         Returns
         -------
         outputs : array ref of Symbol or Symbol
@@ -314,7 +353,7 @@ method unroll(
     Maybe[AI::MXNet::Symbol|ArrayRef[AI::MXNet::Symbol]] :$begin_state=,
     Str                                                  :$input_prefix='',
     Str                                                  :$layout='NTC',
-    Bool                                                 :$merge_outputs=0
+    Maybe[Bool]                                          :$merge_outputs=
 )
 {
     $self->reset;
@@ -374,6 +413,28 @@ method _get_activation($inputs, $activation, @kwargs)
     {
         return &{$activation}($inputs, @kwargs);
     }
+}
+
+method _cells_state_shape($cells)
+{
+    return [map { @{ $_->state_shape } } @$cells];
+}
+
+method _cells_begin_state($cells, @kwargs)
+{
+    return [map { @{ $_->begin_state(@kwargs) } } @$cells];
+}
+
+method _cells_unpack_weights($cells, $args)
+{
+    $args = $_->unpack_weights($args) for @$cells;
+    return $args;
+}
+
+method _cells_pack_weights($cells, $args)
+{
+    $args = $_->pack_weights($args) for @$cells;
+    return $args;
 }
 
 package AI::MXNet::RNN::Cell;
@@ -524,86 +585,9 @@ method state_shape()
     return [[0, $self->_num_hidden], [0, $self->_num_hidden]];
 }
 
-=head2 unpack_weights
-
-        Unpack fused weight matrices into separate
-        weight matrices
-
-        Parameters
-        ----------
-        args : hashref of str -> NDArray
-            dictionary containing packed weights.
-            usually from $Module->get_output()
-
-        Returns
-        -------
-        args : hashref of str -> NDArray
-            dictionary with weights associated to
-            this cell unpacked.
-=cut
-
-method unpack_weights(HashRef[AI::MXNet::NDArray] $args)
+method _gate_names()
 {
-    $args = { %{ $args } };
-    my $outs = ['_i', '_f', '_c', '_o'];
-    my $h = $self->_num_hidden;
-    for my $i ('i2h', 'h2h')
-    {
-        my $weight = delete $args->{ sprintf('%s%s_weight', $self->_prefix, $i) };
-        my $bias   = delete $args->{ sprintf('%s%s_bias', $self->_prefix, $i) };
-        enumerate(sub {
-            my ($j, $name) = @_;
-            my $wname = sprintf('%s%s%s_weight', $self->_prefix, $i, $name);
-            $args->{$wname} = $weight->slice([$j*$h,($j+1)*$h-1])->copy;
-            my $bname = sprintf('%s%s%s_bias', $self->_prefix, $i, $name);
-            $args->{$bname} = $bias->slice([$j*$h,($j+1)*$h-1])->copy;
-        }, $outs);
-    }
-    return $args;
-}
-
-=head2 pack_weights
-
-        Pack separate weight matrices into fused
-        weight.
-
-        Parameters
-        ----------
-        args : hashref of str -> NDArray
-            dictionary containing unpacked weights.
-
-        Returns
-        -------
-        args : hashref of str -> NDArray
-            dictionary with weights associated to
-            this cell packed.
-=cut
-
-
-method pack_weights(HashRef[AI::MXNet::NDArray] $args)
-{
-    $args = { %{ $args } };
-    my @outs = ('_i', '_f', '_c', '_o');
-    my $h = $self->_num_hidden;
-    for my $i ('i2h', 'h2h')
-    {
-        my @weight;
-        my @bias;
-        for my $name (@outs)
-        {
-            my $wname = sprintf('%s%s%s_weight', $self->_prefix, $i, $name);
-            push @weight, delete $args->{$wname};
-            my $bname = sprintf('%s%s%s_bias', $self->_prefix, $i, $name);
-            push @bias, delete $args->{$bname};
-        }
-        $args->{ sprintf('%s%s_weight', $self->_prefix, $i) } = AI::MXNet::NDArray->concatenate(
-            \@weight
-        );
-        $args->{ sprintf('%s%s_bias', $self->_prefix, $i) } = AI::MXNet::NDArray->concatenate(
-            \@bias
-        );
-    }
-    return $args;
+    [qw/_i _f _c _o/];
 }
 
 =head2 call
@@ -705,85 +689,9 @@ extends 'AI::MXNet::RNN::Cell';
 
 has '+_prefix'     => (default => 'gru_');
 
-=head2 unpack_weights
-
-        Unpack fused weight matrices into separate
-        weight matrices
-
-        Parameters
-        ----------
-        args : hashref of str -> NDArray
-            dictionary containing packed weights.
-            usually from $Module->get_output()
-
-        Returns
-        -------
-        args : hashref of str -> NDArray
-            dictionary with weights associated to
-            this cell unpacked.
-=cut
-
-method unpack_weights(HashRef[AI::MXNet::NDArray] $args)
+method _gate_names()
 {
-    $args = { %{ $args } };
-    my $h = $self->_num_hidden;
-    my $outs = ['_z', '_r', '_o'];
-    for my $i ('i2h', 'h2h')
-    {
-        my $weight = delete $args->{ sprintf('%s%s_weight', $self->_prefix, $i) };
-        my $bias   = delete $args->{ sprintf('%s%s_bias', $self->_prefix, $i) };
-        enumerate(sub {
-            my ($j, $name) = @_;
-            my $wname = sprintf('%s%s%s_weight', $self->_prefix, $i, $name);
-            $args->{$wname} = $weight->slice([$j*$h,($j+1)*$h-1])->copy;
-            my $bname = sprintf('%s%s%s_bias', $self->_prefix, $i, $name);
-            $args->{$bname} = $bias->slice([$j*$h,($j+1)*$h-1])->copy;
-        }, $outs);
-    }
-    return $args;
-}
-
-=head2 pack_weights
-
-        Pack separate weight matrices into fused
-        weight.
-
-        Parameters
-        ----------
-        args : hashref of str -> NDArray
-            dictionary containing unpacked weights.
-
-        Returns
-        -------
-        args : hashref of str -> NDArray
-            dictionary with weights associated to
-            this cell packed.
-=cut
-
-
-method pack_weights(HashRef[AI::MXNet::NDArray] $args)
-{
-    $args = { %{ $args } };
-    my @ins = ('_z', '_r', '_o');
-    for my $i ('i2h', 'h2h')
-    {
-        my @weight;
-        my @bias;
-        for my $name (@ins)
-        {
-            my $wname = sprintf('%s%s%s_weight', $self->_prefix, $i, $name);
-            push @weight, delete $args->{$wname};
-            my $bname = sprintf('%s%s%s_bias', $self->_prefix, $i, $name);
-            push @bias, delete $args->{$bname};
-        }
-        $args->{ sprintf('%s%s_weight', $self->_prefix, $i) } = AI::MXNet::NDArray->concatenate(
-            \@weight
-        );
-        $args->{ sprintf('%s%s_bias', $self->_prefix, $i) } = AI::MXNet::NDArray->concatenate(
-            \@bias
-        );
-    }
-    return $args;
+    [qw/_r _z _o/];
 }
 
 =head2 call
@@ -824,19 +732,19 @@ method call(AI::MXNet::Symbol $inputs, SymbolOrArrayOfSymbols $states)
         num_hidden => $self->_num_hidden*3,
         name       => "${name}h2h"
     );
-    my ($i2h_z, $i2h_r);
-    ($i2h_z, $i2h_r, $i2h) = @{ AI::MXNet::Symbol->SliceChannel(
+    my ($i2h_r, $i2h_z);
+    ($i2h_r, $i2h_z, $i2h) = @{ AI::MXNet::Symbol->SliceChannel(
         $i2h, num_outputs => 3, name => "${name}_i2h_slice"
     ) };
-    my ($h2h_z, $h2h_r);
-    ($h2h_z, $h2h_r, $h2h) = @{ AI::MXNet::Symbol->SliceChannel(
+    my ($h2h_r, $h2h_z);
+    ($h2h_r, $h2h_z, $h2h) = @{ AI::MXNet::Symbol->SliceChannel(
         $h2h, num_outputs => 3, name => "${name}_h2h_slice"
     ) };
-    my $update_gate = AI::MXNet::Symbol->Activation(
-        $i2h_z + $h2h_z, act_type => "sigmoid", name => "${name}_z_act"
-    );
     my $reset_gate = AI::MXNet::Symbol->Activation(
         $i2h_r + $h2h_r, act_type => "sigmoid", name => "${name}_r_act"
+    );
+    my $update_gate = AI::MXNet::Symbol->Activation(
+        $i2h_z + $h2h_z, act_type => "sigmoid", name => "${name}_z_act"
     );
     my $next_h_tmp = AI::MXNet::Symbol->Activation(
         $i2h + $reset_gate * $h2h, act_type => "tanh", name => "${name}_h_act"
@@ -845,7 +753,7 @@ method call(AI::MXNet::Symbol $inputs, SymbolOrArrayOfSymbols $states)
         (1 - $update_gate) * $next_h_tmp, $update_gate * $prev_state_h,
         name => "${name}out"
     );
-    return ($next_h, [$next_h])
+    return ($next_h, [$next_h]);
 }
 
 package AI::MXNet::RNN::FusedCell;
@@ -879,9 +787,7 @@ has '_mode'            => (
     default => 'lstm'
 );
 has [qw/_parameter
-        _directions
-        _weight_names
-        _num_weights/] => (is => 'rw', init_arg => undef);
+        _directions/] => (is => 'rw', init_arg => undef);
 
 around BUILDARGS => sub {
     my $orig  = shift;
@@ -919,14 +825,7 @@ sub BUILD
         );
     }
     $self->_parameter($self->params->get('parameters', init => $self->initializer));
-    $self->_directions($self->_bidirectional ? 2 : 1);
-    $self->_weight_names({
-        rnn_relu => [''],
-        rnn_tanh => [''],
-        lstm     => ['_i', '_f', '_c', '_o'],
-        gru      => ['_r', '_z', '_o']
-    }->{ $self->_mode });
-    $self->_num_weights(scalar@{ $self->_weight_names });
+    $self->_directions($self->_bidirectional ? [qw/l r/] : ['l']);
 }
 
 
@@ -937,25 +836,38 @@ method state_shape()
     return [([$b*$self->_num_layers, 0, $self->_num_hidden])x$n];
 }
 
-# slice fused rnn weights
+method _gate_names()
+{
+    return {
+        rnn_relu => [''],
+        rnn_tanh => [''],
+        lstm     => [qw/_i _f _c _o/],
+        gru      => [qw/_r _z _o/]
+    }->{ $self->_mode };
+}
+
+method _num_gates()
+{
+    return scalar(@{ $self->_gate_names })
+}
+
 method _slice_weights($arr, $li, $lh)
 {
     my %args;
-    my $b = $self->_directions;
-    my $m = $self->_num_weights;
-    my @c = @{ $self->_weight_names };
-    my @d = ('l', 'r');
+    my @gate_names = @{ $self->_gate_names };
+    my @directions = @{ $self->_directions };
 
+    my $b = @directions;
     my $p = 0;
-    for my $i (0..$self->_num_layers-1)
+    for my $layer (0..$self->_num_layers-1)
     {
-        for my $j (0..$b-1)
+        for my $direction (@directions)
         {
-            for my $k (0..$m-1)
+            for my $gate (@gate_names)
             {
-                my $name = sprintf('%s%s%d_i2h%s_weight', $self->_prefix, $d[$j], $i, $c[$k]);
+                my $name = sprintf('%s%s%d_i2h%s_weight', $self->_prefix, $direction, $layer, $gate);
                 my $size;
-                if($i > 0)
+                if($layer > 0)
                 {
                     $size = $b*$lh*$lh;
                     $args{$name} = $arr->slice([$p,$p+$size-1])->reshape([$lh, $b*$lh]);
@@ -967,28 +879,28 @@ method _slice_weights($arr, $li, $lh)
                 }
                 $p += $size;
             }
-            for my $k (0..$m-1)
+            for my $gate (@gate_names)
             {
-                my $name = sprintf('%s%s%d_h2h%s_weight', $self->_prefix, $d[$j], $i, $c[$k]);
+                my $name = sprintf('%s%s%d_h2h%s_weight', $self->_prefix, $direction, $layer, $gate);
                 my $size = $lh**2;
                 $args{$name} = $arr->slice([$p,$p+$size-1])->reshape([$lh, $lh]);
                 $p += $size;
             }
         }
     }
-    for my $i (0..$self->_num_layers-1)
+    for my $layer (0..$self->_num_layers-1)
     {
-        for my $j (0..$b-1)
+        for my $direction (@directions)
         {
-            for my $k (0..$m-1)
+            for my $gate (@gate_names)
             {
-                my $name = sprintf('%s%s%d_i2h%s_bias', $self->_prefix, $d[$j], $i, $c[$k]);
+                my $name = sprintf('%s%s%d_i2h%s_bias', $self->_prefix, $direction, $layer, $gate);
                 $args{$name} = $arr->slice([$p,$p+$lh-1]);
                 $p += $lh;
             }
-            for my $k (0..$m-1)
+            for my $gate (@gate_names)
             {
-                my $name = sprintf('%s%s%d_h2h%s_bias', $self->_prefix, $d[$j], $i, $c[$k]);
+                my $name = sprintf('%s%s%d_h2h%s_bias', $self->_prefix, $direction, $layer, $gate);
                 $args{$name} = $arr->slice([$p,$p+$lh-1]);
                 $p += $lh;
             }
@@ -1002,8 +914,8 @@ method unpack_weights(HashRef[AI::MXNet::NDArray] $args)
 {
     my %args = %{ $args };
     my $arr = delete $args{ $self->_parameter->name };
-    my $b = $self->_directions;
-    my $m = $self->_num_weights;
+    my $b = @{ $self->_directions };
+    my $m = $self->_num_gates;
     my $h = $self->_num_hidden;
     my $num_input = int(int(int($arr->size/$b)/$h)/$m) - ($self->_num_layers - 1)*($h+$b*$h+2) - $h - 2;
     my %nargs = $self->_slice_weights($arr, $num_input, $self->_num_hidden);
@@ -1015,8 +927,8 @@ method pack_weights(HashRef[AI::MXNet::NDArray] $args)
 {
     my %args = %{ $args };
     my $b = $self->_directions;
-    my $m = $self->_num_weights;
-    my @c = @{ $self->_weight_names };
+    my $m = $self->_num_gates;
+    my @c = @{ $self->_gate_names };
     my $h = $self->_num_hidden;
     my $w0 = $args{ sprintf('%sl0_i2h%s_weight', $self->_prefix, $c[0]) };
     my $num_input = $w0->shape->[1];
@@ -1067,8 +979,13 @@ method call(AI::MXNet::Symbol $inputs, SymbolOrArrayOfSymbols $states)
             placehodlers.
         layout : str
             layout of input/output symbol.
-        merge_outputs : Bool
-            default 0
+        merge_outputs : bool
+            If False, return outputs as a list of Symbols.
+            If True, concatenate output across time steps
+            and return a single symbol with shape
+            (batch_size, length, ...) if layout == 'NTC',
+            or (length, batch_size, ...) if layout == 'TNC'.
+            If undef, output whatever is faster
 
         Returns
         -------
@@ -1084,7 +1001,7 @@ method unroll(
     Maybe[AI::MXNet::Symbol|ArrayRef[AI::MXNet::Symbol]] :$begin_state=,
     Str                                                  :$input_prefix='',
     Str                                                  :$layout='NTC',
-    Bool                                                 :$merge_outputs=0
+    Maybe[Bool]                                          :$merge_outputs=
 )
 {
     $self->reset;
@@ -1156,7 +1073,7 @@ method unroll(
         my @rnn = @{ $rnn };
         ($outputs, $states) = ($rnn[0], [$rnn[1]]);
     }
-    if(not $merge_outputs)
+    if(defined $merge_outputs and not $merge_outputs)
     {
         AI::MXNet::Logging->warning(
             "Call RNN::FusedCell->unroll with merge_outputs=1 "
@@ -1202,7 +1119,6 @@ extends 'AI::MXNet::RNN::Cell::Base';
 
 has [qw/_override_cell_params _cells/] => (is => 'rw', init_arg => undef);
 
-
 sub BUILD
 {
     my ($self, $original_arguments) = @_;
@@ -1236,9 +1152,8 @@ method add(AI::MXNet::RNN::Cell::Base $cell)
 
 method state_shape()
 {
-    return [map { @{ $_->state_shape } } $self->_cells];
+    return $self->_cells_state_shape($self->_cells);
 }
-
 
 method begin_state(@kwargs)
 {
@@ -1247,19 +1162,17 @@ method begin_state(@kwargs)
         "After applying modifier cells (e.g. DropoutCell) the base "
         ."cell cannot be called directly. Call the modifier cell instead."
     );
-    return [map { @{ $_->begin_state(@kwargs) } } @{ $self->_cells }];
+    return $self->_cells_begin_state($self->_cells, @kwargs);
 }
 
 method unpack_weights(HashRef[AI::MXNet::NDArray] $args)
 {
-    $args = $_->unpack_weights($args) for @{ $self->_cells };
-    return $args;
+    return $self->_cells_unpack_weights($self->_cells, $args)
 }
 
 method pack_weights(HashRef[AI::MXNet::NDArray] $args)
 {
-    $args = $_->pack_weights($args) for @{ $self->_cells };
-    return $args;
+    return $self->_cells_pack_weights($self->_cells, $args);
 }
 
 method call($inputs, $states)
@@ -1269,6 +1182,7 @@ method call($inputs, $states)
     my $p = 0;
     for my $cell (@{ $self->_cells })
     {
+        assert(not $cell->isa('AI::MXNet::BidirectionalCell'));
         my $n = scalar(@{ $cell->state_shape });
         my $state = [@{ $states }[$p..$p+$n-1]];
         $p += $n;
@@ -1276,6 +1190,225 @@ method call($inputs, $states)
         push @next_states, $state;
     }
     return ($inputs, [map { @$_} @next_states]);
+}
+
+method unroll(
+    Int $length,
+    Maybe[AI::MXNet::Symbol|ArrayRef[AI::MXNet::Symbol]] :$inputs=,
+    Maybe[AI::MXNet::Symbol|ArrayRef[AI::MXNet::Symbol]] :$begin_state=,
+    Str                                                  :$input_prefix='',
+    Str                                                  :$layout='NTC',
+    Maybe[Bool]                                          :$merge_outputs=
+)
+{
+    my $num_cells = @{ $self->_cells };
+    $begin_state //= $self->begin_state;
+    my $p = 0;
+    my $states;
+    enumerate(sub {
+        my ($i, $cell) = @_;
+        my $n   = @{ $cell->state_shape };
+        $states = [@{$begin_state}[$p..$p+$n-1]];
+        $p += $n;
+        ($inputs, $states) = $cell->unroll(
+            $length,
+            inputs          => $inputs,
+            input_prefix    => $input_prefix,
+            begin_state     => $states,
+            layout          => $layout,
+            merge_outputs   => ($i < $num_cells-1) ? undef : $merge_outputs
+        );
+    }, $self->_cells);
+    return ($inputs, $states);
+}
+
+package AI::MXNet::RNN::BidirectionalCell;
+use Mouse;
+use AI::MXNet::Base;
+extends 'AI::MXNet::RNN::Cell::Base';
+
+=head1 NAME
+
+    AI::MXNet::RNN::BidirectionalCell
+=cut
+
+=head1 DESCRIPTION
+
+    Bidirectional RNN cell
+
+    Parameters
+    ----------
+    l_cell : BaseRNNCell
+        cell for forward unrolling
+    r_cell : BaseRNNCell
+        cell for backward unrolling
+    output_prefix : str, default 'bi_'
+        prefix for name of output
+=cut
+
+has 'l_cell'         => (is => 'ro', isa => 'AI::MXNet::RNN::Cell::Base', required => 1);
+has 'r_cell'         => (is => 'ro', isa => 'AI::MXNet::RNN::Cell::Base', required => 1);
+has '_output_prefix' => (is => 'ro', init_arg => 'output_prefix', isa => 'Str', default => 'bi_');
+has '_prefix'        => (default => '');
+has [qw/_override_cell_params _cells/] => (is => 'rw', init_arg => undef);
+
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    if(@_ >= 2 and blessed $_[0] and blessed $_[1])
+    {
+        my $l_cell = shift(@_);
+        my $r_cell = shift(@_);
+        return $class->$orig(
+            l_cell => $l_cell,
+            r_cell => $r_cell,
+            @_
+        );
+    }
+    return $class->$orig(@_);
+};
+
+sub BUILD
+{
+    my ($self, $original_arguments) = @_;
+    $self->_override_cell_params(defined $original_arguments->{params});
+    $self->_cells([$self->l_cell, $self->r_cell]);
+}
+
+method unpack_weights(HashRef[AI::MXNet::NDArray] $args)
+{
+    return $self->_cells_unpack_weights($self->_cells, $args)
+}
+
+method pack_weights(HashRef[AI::MXNet::NDArray] $args)
+{
+    return $self->_cells_pack_weights($self->_cells, $args);
+}
+
+method call($inputs, $states)
+{
+    confess("Bidirectional cannot be stepped. Please use unroll");
+}
+
+method state_shape()
+{
+    return $self->_cells_state_shape($self->_cells);
+}
+
+method begin_state(@kwargs)
+{
+    assert((not $self->_modified),
+            "After applying modifier cells (e.g. DropoutCell) the base "
+            ."cell cannot be called directly. Call the modifier cell instead."
+    );
+    return $self->_cells_begin_state($self->_cells, @kwargs);
+}
+
+method unroll(
+    Int $length,
+    Maybe[AI::MXNet::Symbol|ArrayRef[AI::MXNet::Symbol]] :$inputs=,
+    Maybe[AI::MXNet::Symbol|ArrayRef[AI::MXNet::Symbol]] :$begin_state=,
+    Str                                                  :$input_prefix='',
+    Str                                                  :$layout='NTC',
+    Maybe[Bool]                                          :$merge_outputs=
+)
+{
+    my $axis = index($layout, 'T');
+    if(not defined $inputs)
+    {
+        $inputs = [
+            map { AI::MXNet::Symbol->Variable("${input_prefix}t${_}_data") } (0..$length-1)
+        ];
+    }
+    elsif(blessed($inputs))
+    {
+        assert(
+            (@{ $inputs->list_outputs() } == 1),
+            "unroll doesn't allow grouped symbol as input. Please "
+            ."convert to list first or let unroll handle slicing"
+        );
+        $inputs = AI::MXNet::Symbol->SliceChannel(
+            $inputs,
+            axis         => $axis,
+            num_outputs  => $length,
+            squeeze_axis => 1
+        );
+    }
+    else
+    {
+        assert(@$inputs == $length);
+    }
+    $begin_state //= $self->begin_state;
+    my $states = $begin_state;
+    my ($l_cell, $r_cell) = @{ $self->_cells };
+    my ($l_outputs, $l_states) = $l_cell->unroll(
+        $length, inputs => $inputs,
+        begin_state     => [@{$states}[0..@{$l_cell->state_shape}-1]],
+        layout          => $layout,
+        merge_outputs   => $merge_outputs
+    );
+    my ($r_outputs, $r_states) = $r_cell->unroll(
+        $length, inputs => [reverse @{$inputs}],
+        begin_state     => [@{$states}[@{$l_cell->state_shape}..@{$states}-1]],
+        layout          => $layout,
+        merge_outputs   => $merge_outputs
+    );
+    if(not defined $merge_outputs)
+    {
+        $merge_outputs = (
+            blessed $l_outputs and $l_outputs->isa('AI::MXNet::Symbol')
+                and
+            blessed $r_outputs and $r_outputs->isa('AI::MXNet::Symbol')
+        );
+        if(not $merge_outputs)
+        {
+            if(blessed $l_outputs and $l_outputs->isa('AI::MXNet::Symbol'))
+            {
+                $l_outputs = [
+                    AI::MXNet::Symbol->SliceChannel(
+                        $l_outputs, axis => $axis,
+                        num_outputs      => $length,
+                        squeeze_axis     => 1
+                    )
+                ];
+            }
+            if(blessed $r_outputs and $r_outputs->isa('AI::MXNet::Symbol'))
+            {
+                $r_outputs = [
+                    AI::MXNet::Symbol->SliceChannel(
+                        $r_outputs, axis => $axis,
+                        num_outputs      => $length,
+                        squeeze_axis     => 1
+                    )
+                ];
+            }
+        }
+    }
+    if($merge_outputs)
+    {
+        $l_outputs = [$l_outputs];
+        $r_outputs = [AI::MXNet::Symbol->reverse($r_outputs, axis=>$axis)];
+    }
+    else
+    {
+        $r_outputs = [reverse(@{ $r_outputs })];
+    }
+    my $outputs = [];
+    zip(sub {
+        my ($i, $l_o, $r_o) = @_;
+        push @$outputs, AI::MXNet::Symbol->Concat(
+            $l_o, $r_o, dim=>(1+($merge_outputs?1:0)),
+            name => $merge_outputs
+                        ? sprintf('%sout', $self->_output_prefix)
+                        : sprintf('%st%d', $self->_output_prefix, $i)
+        );
+    }, [0..@{ $l_outputs }-1], [@{ $l_outputs }], [@{ $l_outputs }]);
+    if($merge_outputs)
+    {
+        $outputs = $outputs->[0];
+    }
+    $states = [$l_states, $r_states];
+    return($outputs, $states);
 }
 
 package AI::MXNet::RNN::ModifierCell;
