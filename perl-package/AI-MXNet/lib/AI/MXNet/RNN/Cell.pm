@@ -1373,6 +1373,7 @@ method unroll(
     Maybe[Bool]                                          :$merge_outputs=
 )
 {
+
     my $axis = index($layout, 'T');
     if(not defined $inputs)
     {
@@ -1387,12 +1388,12 @@ method unroll(
             "unroll doesn't allow grouped symbol as input. Please "
             ."convert to list first or let unroll handle slicing"
         );
-        $inputs = AI::MXNet::Symbol->SliceChannel(
+        $inputs = [ @{ AI::MXNet::Symbol->SliceChannel(
             $inputs,
             axis         => $axis,
             num_outputs  => $length,
             squeeze_axis => 1
-        );
+        ) }];
     }
     else
     {
@@ -1425,29 +1426,29 @@ method unroll(
             if(blessed $l_outputs and $l_outputs->isa('AI::MXNet::Symbol'))
             {
                 $l_outputs = [
-                    AI::MXNet::Symbol->SliceChannel(
+                    @{ AI::MXNet::Symbol->SliceChannel(
                         $l_outputs, axis => $axis,
                         num_outputs      => $length,
                         squeeze_axis     => 1
-                    )
+                    ) }
                 ];
             }
             if(blessed $r_outputs and $r_outputs->isa('AI::MXNet::Symbol'))
             {
                 $r_outputs = [
-                    AI::MXNet::Symbol->SliceChannel(
+                    @{ AI::MXNet::Symbol->SliceChannel(
                         $r_outputs, axis => $axis,
                         num_outputs      => $length,
                         squeeze_axis     => 1
-                    )
+                    ) }
                 ];
             }
         }
     }
     if($merge_outputs)
     {
-        $l_outputs = [$l_outputs];
-        $r_outputs = [AI::MXNet::Symbol->reverse($r_outputs, axis=>$axis)];
+        $l_outputs = [@{ $l_outputs }];
+        $r_outputs = [@{ AI::MXNet::Symbol->reverse(blessed $r_outputs ? $r_outputs : @{ $r_outputs }, axis=>$axis) }];
     }
     else
     {
@@ -1462,10 +1463,10 @@ method unroll(
                         ? sprintf('%sout', $self->_output_prefix)
                         : sprintf('%st%d', $self->_output_prefix, $i)
         );
-    }, [0..@{ $l_outputs }-1], [@{ $l_outputs }], [@{ $l_outputs }]);
+    }, [0..@{ $l_outputs }-1], [@{ $l_outputs }], [@{ $r_outputs }]);
     if($merge_outputs)
     {
-        $outputs = $outputs->[0];
+        $outputs = @{ $outputs }[0];
     }
     $states = [$l_states, $r_states];
     return($outputs, $states);
