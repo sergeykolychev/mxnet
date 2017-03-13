@@ -1310,7 +1310,6 @@ extends 'AI::MXNet::RNN::Cell::Base';
 has 'l_cell'         => (is => 'ro', isa => 'AI::MXNet::RNN::Cell::Base', required => 1);
 has 'r_cell'         => (is => 'ro', isa => 'AI::MXNet::RNN::Cell::Base', required => 1);
 has '_output_prefix' => (is => 'ro', init_arg => 'output_prefix', isa => 'Str', default => 'bi_');
-has '_prefix'        => (default => '');
 has [qw/_override_cell_params _cells/] => (is => 'rw', init_arg => undef);
 
 around BUILDARGS => sub {
