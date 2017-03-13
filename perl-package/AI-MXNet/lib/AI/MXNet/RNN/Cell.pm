@@ -926,7 +926,7 @@ method unpack_weights(HashRef[AI::MXNet::NDArray] $args)
 method pack_weights(HashRef[AI::MXNet::NDArray] $args)
 {
     my %args = %{ $args };
-    my $b = $self->_directions;
+    my $b = @{ $self->_directions };
     my $m = $self->_num_gates;
     my @c = @{ $self->_gate_names };
     my $h = $self->_num_hidden;
