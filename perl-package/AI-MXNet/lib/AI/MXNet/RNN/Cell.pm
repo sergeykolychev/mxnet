@@ -831,7 +831,7 @@ sub BUILD
 
 method state_shape()
 {
-    my $b = $self->_directions;
+    my $b = @{ $self->_directions };
     my $n = $self->_mode eq 'lstm' ? 2 : 1;
     return [([$b*$self->_num_layers, 0, $self->_num_hidden])x$n];
 }
