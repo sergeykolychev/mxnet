@@ -1095,6 +1095,67 @@ method unroll(
     return ($outputs, $states);
 }
 
+=head2 unfuse
+
+    Unfuse the fused RNN
+
+    Returns
+    -------
+    cell : SequentialRNNCell
+            unfused cell that can be used for stepping, and can run on CPU.
+=cut
+
+method unfuse()
+{
+    my $stack = AI::MXNet::RNN::SequentialCell->new;
+    my $get_cell = {
+        rnn_relu => sub {
+            AI::MXNet::RNN::Cell->new(
+                num_hidden => $self->_num_hidden,
+                activation => 'relu',
+                prefix     => shift
+            )
+        },
+        rnn_tanh => sub {
+            AI::MXNet::RNN::Cell->new(
+                num_hidden => $self->_num_hidden,
+                activation => 'tanh',
+                prefix     => shift
+            )
+        },
+        lstm     => sub {
+            AI::MXNet::RNN::LSTMCell->new(
+                num_hidden => $self->_num_hidden,
+                prefix     => shift
+            )
+        },
+        gru      => sub {
+            AI::MXNet::RNN::GRUCell->new(
+                num_hidden => $self->_num_hidden,
+                prefix     => shift
+            )
+        },
+    }->{ $self->_mode };
+    for my $i (0..$self->_num_layers-1)
+    {
+        if($self->_bidirectional)
+        {
+            $stack->add(
+                AI::MXNet::RNN::BidirectionalCell->new(
+                    $get_cell->(sprintf('%sl%d_', $self->_prefix, $i)),
+                    $get_cell->(sprintf('%sr%d_', $self->_prefix, $i)),
+                    output_prefix => sprintf('%sbi_%s_%d', $self->_prefix, $self->_mode, $i)
+                )
+            );
+        }
+        else
+        {
+            $stack->add($get_cell->(sprintf('%sl%d_', $self->_prefix, $i)));
+        }
+    }
+    return $stack;
+}
+
 package AI::MXNet::RNN::SequentialCell;
 use Mouse;
 use AI::MXNet::Base;

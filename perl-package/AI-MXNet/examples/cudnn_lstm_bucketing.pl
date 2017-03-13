@@ -110,7 +110,7 @@ my $train = sub
             $stack->add(
                 mx->rnn->FusedRNNCell(
                     $num_hidden, num_layers => 1,
-                    mode => 'lstm', prefix => "fused_rnn$i",
+                    mode => 'lstm', prefix => "lstm_$i",
                     bidirectional => $bidirectional
                 )
             );
@@ -181,22 +181,33 @@ my $train = sub
 my $test = sub {
     assert($model_prefix, "Must specifiy path to load from");
     my (undef, $data_val, $vocab) = get_data('NT');
-    my $stack = mx->rnn->SequentialRNNCell();
-    for my $i (0..$num_layers-1)
+    my $stack;
+    if($stack_rnn)
     {
-        my $cell = mx->rnn->LSTMCell(num_hidden => $num_hidden, prefix => "lstm_l${i}_");
-        if($bidirectional)
+        $stack = mx->rnn->SequentialRNNCell();
+        for my $i (0..$num_layers-1)
         {
-            $cell = mx->rnn->BidirectionalCell(
-                $cell,
-                mx->rnn->LSTMCell(
-                    num_hidden => $num_hidden,
-                    prefix => "lstm_r${i}_"
-                ),
-                output_prefix => "bi_lstm_$i"
-            );
+            my $cell = mx->rnn->LSTMCell(num_hidden => $num_hidden, prefix => "lstm_${i}l0_");
+            if($bidirectional)
+            {
+                $cell = mx->rnn->BidirectionalCell(
+                    $cell,
+                    mx->rnn->LSTMCell(
+                        num_hidden => $num_hidden,
+                        prefix => "lstm_${i}r0_"
+                    ),
+                    output_prefix => "bi_lstm_$i"
+                );
+            }
+            $stack->add($cell);
         }
-        $stack->add($cell);
+    }
+    else
+    {
+        $stack = mx->rnn->FusedRNNCell(
+            $num_hidden,  num_layers    => $num_layers,
+            mode=>'lstm', bidirectional => $bidirectional
+        )->unfuse()
     }
     my $sym_gen = sub {
         my $seq_len = shift;

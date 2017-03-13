@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use AI::MXNet qw(mx);
 use PDL;
-use Test::More tests => 33;
+use Test::More tests => 35;
 
 sub test_rnn
 {
@@ -73,8 +73,22 @@ sub test_bidirectional
     is_deeply($outs, [[10, 200], [10, 200], [10, 200]]);
 }
 
+sub test_unfuse
+{
+    my $cell = mx->rnn->FusedRNNCell(
+        100, num_layers => 1, mode => 'lstm',
+        prefix => 'test_', bidirectional => 1
+    )->unfuse;
+    my ($outputs) = $cell->unroll(3, input_prefix=>'rnn_');
+    $outputs = mx->sym->Group($outputs);
+    is_deeply($outputs->list_outputs(), ['test_bi_lstm_0t0_output', 'test_bi_lstm_0t1_output', 'test_bi_lstm_0t2_output']);
+    my (undef, $outs, undef) = $outputs->infer_shape(rnn_t0_data=>[10,50], rnn_t1_data=>[10,50], rnn_t2_data=>[10,50]);
+    is_deeply($outs, [[10, 200], [10, 200], [10, 200]]);
+}
+
 test_rnn();
 test_lstm();
 test_gru();
 test_stack();
 test_bidirectional();
+test_unfuse();
