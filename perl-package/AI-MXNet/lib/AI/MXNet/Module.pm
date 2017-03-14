@@ -83,10 +83,10 @@ func _create_kvstore(
 
 func _initialize_kvstore(
     AI::MXNet::KVStore           :$kvstore,
-    ArrayRef[AI::MXNet::NDArray] :$param_arrays,
     HashRef[AI::MXNet::NDArray]  :$arg_params,
     ArrayRef[Str]                :$param_names,
-    Bool                         :$update_on_kvstore
+    Bool                         :$update_on_kvstore,
+    ArrayRef[AI::MXNet::NDArray]|ArrayRef[ArrayRef[AI::MXNet::NDArray]] :$param_arrays
 )
 {
     enumerate(sub{
@@ -104,9 +104,9 @@ func _initialize_kvstore(
     Perform update of param_arrays from grad_arrays on kvstore.
 =cut
 
-method _update_params_on_kvstore(
-    ArrayRef[AI::MXNet::NDArray] $param_arrays,
-    ArrayRef[AI::MXNet::NDArray] $grad_arrays,
+func _update_params_on_kvstore(
+    ArrayRef[AI::MXNet::NDArray]|ArrayRef[ArrayRef[AI::MXNet::NDArray]] $param_arrays,
+    ArrayRef[AI::MXNet::NDArray]|ArrayRef[ArrayRef[AI::MXNet::NDArray]] $grad_arrays,
     AI::MXNet::KVStore           $kvstore
 )
 {
@@ -250,7 +250,11 @@ has 'context'           => (
 around BUILDARGS => sub {
     my $orig  = shift;
     my $class = shift;
-    return $class->$orig(symbol => $_[0]) if @_ == 1;
+    if(@_%2)
+    {
+        my $symbol = shift;
+        return $class->$orig(symbol => $symbol, @_);
+    }
     return $class->$orig(@_);
 };
 
@@ -291,8 +295,8 @@ sub BUILD
     $self->_check_input_names($self->_symbol, $self->_p->_fixed_param_names, "fixed_param", 1);
 }
 
-sub Module { my $class = shift; return $class->new(@_) }
-sub BucketingModule { shift; return AI::MXNet::Module::Bucketing->new(@_) }
+method Module(@args) { return @args ?  __PACKAGE__->new(@args) : __PACKAGE__ }
+method BucketingModule(@args) { return AI::MXNet::Module::Bucketing->new(@args) }
 
 =head load
 
@@ -336,12 +340,10 @@ method load(
     my $mod = $self->new(symbol => $sym, %kwargs);
     $mod->_p->_arg_params($args);
     $mod->_p->_aux_params($auxs);
-    if($mod->params_initialized)
+    $mod->params_initialized(1);
+    if($load_optimizer_states)
     {
-        if($load_optimizer_states)
-        {
-            $mod->_p->_preload_opt_states(sprintf('%s-%04d.states', $prefix, $epoch));
-        }
+        $mod->_p->_preload_opt_states(sprintf('%s-%04d.states', $prefix, $epoch));
     }
     return $mod;
 }
@@ -720,6 +722,7 @@ method bind(
             data_shapes       => $self->_p->_data_shapes,
             label_shapes      => $self->_p->_label_shapes,
             param_names       => $self->_p->_param_names,
+            state_names       => $state_names,
             for_training      => $for_training,
             inputs_need_grad  => $inputs_need_grad,
             shared_group      => $shared_group,
@@ -776,8 +779,8 @@ method bind(
 =cut
 
 method reshape(
-    ArrayRef[AI::MXNet::DataDesc|NameShape]        $data_shapes,
-    Maybe[ArrayRef[AI::MXNet::DataDesc|NameShape]] $label_shapes=
+    ArrayRef[AI::MXNet::DataDesc|NameShape]        :$data_shapes,
+    Maybe[ArrayRef[AI::MXNet::DataDesc|NameShape]] :$label_shapes=
 )
 {
     assert($self->binded);
@@ -877,7 +880,7 @@ method init_optimizer(
         # copy initialized local parameters to kvstore
         _initialize_kvstore(
             kvstore           => $kvstore,
-            param_arrays      => $self->_p->_exec_group->param_arrays,
+            param_arrays      => $self->_p->_exec_group->_p->param_arrays,
             arg_params        => $self->_p->_arg_params,
             param_names       => $self->_p->_param_names,
             update_on_kvstore => $update_on_kvstore
@@ -972,8 +975,8 @@ method update()
     if($self->_p->_update_on_kvstore)
     {
         _update_params_on_kvstore(
-            $self->_p->_exec_group->param_arrays,
-            $self->_p->_exec_group->grad_arrays,
+            $self->_p->_exec_group->_p->param_arrays,
+            $self->_p->_exec_group->_p->grad_arrays,
             $self->_p->_kvstore
         );
     }
@@ -1045,7 +1048,7 @@ method get_states(Bool $merge_multi_context=1)
     return $self->_p->_exec_group->get_states($merge_multi_context);
 }
 
-method set_states($states=, $value=)
+method set_states(:$states=, :$value=)
 {
     assert($self->binded and $self->params_initialized);
     return $self->_p->_exec_group->set_states($states, $value);
@@ -1148,5 +1151,14 @@ method install_monitor(AI::MXNet::Monitor $mon)
     $self->_p->_exec_group->install_monitor($mon);
 }
 
+method _updater()
+{
+    $self->_p->_updater;
+}
+
+method _kvstore()
+{
+    $self->_p->_kvstore;
+}
 
 1;

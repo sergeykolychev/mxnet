@@ -59,6 +59,9 @@ method init_data(
     return \@ret;
 }
 
+method DataDesc(@args)  { AI::MXNet::DataDesc->new(@args)  }
+method DataBatch(@args) { AI::MXNet::DataBatch->new(@args) }
+
 package AI::MXNet::DataDesc;
 use Mouse;
 use overload '""'  => \&stringify,
@@ -71,7 +74,12 @@ has 'layout' => (is => 'ro', isa => "Str",   default => 'NCHW');
 around BUILDARGS => sub {
     my $orig  = shift;
     my $class = shift;
-    return $class->$orig(name => $_[0], shape => $_[1]) if @_ == 2;
+    if(@_ >= 2 and ref $_[1] eq 'ARRAY')
+    {
+        my $name  = shift;
+        my $shape = shift;
+        return $class->$orig(name => $name, shape => $shape, @_);
+    }
     return $class->$orig(@_);
 };
 

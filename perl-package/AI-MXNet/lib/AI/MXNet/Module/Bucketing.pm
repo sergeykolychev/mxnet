@@ -270,10 +270,10 @@ method get_states(Bool $merge_multi_context=1)
     $self->_curr_module->get_states($merge_multi_context);
 }
 
-method set_states($states, $value)
+method set_states(:$states=, :$value=)
 {
     assert($self->binded and $self->params_initialized);
-    $self->_curr_module->set_states($states, $value);
+    $self->_curr_module->set_states(states => $states, value => $value);
 }
 
 =head2 bind

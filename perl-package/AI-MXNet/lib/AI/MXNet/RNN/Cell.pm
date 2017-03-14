@@ -194,7 +194,7 @@ method state_shape()
             starting states for first RNN step
 =cut
 
-method begin_state(CodeRef $func=AI::MXNet::Symbol->can('zeros'), @kwargs)
+method begin_state(CodeRef :$func=AI::MXNet::Symbol->can('zeros'), @kwargs)
 {
     assert(
         (not $self->_modified),
@@ -1518,7 +1518,7 @@ method state_shape()
     return $self->base_cell->state_shape;
 }
 
-method begin_state(CodeRef $init_sym=AI::MXNet::Symbol->can('zeros'), @kwargs)
+method begin_state(CodeRef :$init_sym=AI::MXNet::Symbol->can('zeros'), @kwargs)
 {
     assert(
         not $self->_modified,
@@ -1526,7 +1526,7 @@ method begin_state(CodeRef $init_sym=AI::MXNet::Symbol->can('zeros'), @kwargs)
         ."cell cannot be called directly. Call the modifier cell instead."
     );
     $self->base_cell->_modified(0);
-    my $begin_state = $self->base_cell->begin_state($init_sym, @kwargs);
+    my $begin_state = $self->base_cell->begin_state(func => $init_sym, @kwargs);
     $self->base_cell->_modified(1);
     return $begin_state;
 }

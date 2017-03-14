@@ -107,7 +107,7 @@ func _merge_multi_context($outputs, $major_axis)
             else
             {
                 my $ctx = $tensors->[0]->context;
-                push @rets, AI::MXNet::NDArray->concat(map { $_->as_in_context($ctx) } @$tensors, { dim => $axis });
+                push @rets, AI::MXNet::NDArray->concat((map { $_->as_in_context($ctx) } @$tensors), { dim => $axis });
             }
         }
         else
@@ -370,6 +370,7 @@ method _collect_arrays
             push @{ $self->_p->param_arrays }, \@tmp;
         }
     }
+    $self->_p->state_arrays([]);
     for my $i (0..@{ $self->state_names }-1)
     {
         my $name = $self->state_names->[$i];

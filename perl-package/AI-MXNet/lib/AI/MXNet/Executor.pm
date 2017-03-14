@@ -430,7 +430,7 @@ method copy_params_from(
 =cut
 
 
-method reshape(HashRef[Shape] $kwargs, Int $partial_shaping=0, Int $allow_up_sizing=0)
+method reshape(HashRef[Shape] $kwargs, Int :$partial_shaping=0, Int :$allow_up_sizing=0)
 {
     my ($arg_shapes, undef, $aux_shapes) = $self->_symbol->infer_shape(%{ $kwargs });
     confess("Insufficient argument shapes provided.") 
