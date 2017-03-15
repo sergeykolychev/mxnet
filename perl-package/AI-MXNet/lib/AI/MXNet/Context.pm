@@ -9,7 +9,14 @@ use constant devstr2type => { cpu => 1, gpu => 2, cpu_pinned => 3 };
 around BUILDARGS => sub {
     my $orig  = shift;
     my $class = shift;
-    return $class->$orig(device_type => $_[0]) if @_ == 1;
+    return $class->$orig(device_type => $_[0])
+        if @_ == 1 and $_[0] =~ /^(?:cpu|gpu|cpu_pinned)$/;
+    return $class->$orig(
+        device_type => $_[0]->device_type,
+        device_id   => $_[0]->device_id
+    ) if @_ == 1 and blessed $_[0];
+    return $class->$orig(device_type => $_[0], device_id => $_[0])
+        if @_ == 2 and $_[0] =~ /^(?:cpu|gpu|cpu_pinned)$/;
     return $class->$orig(@_);
 };
 

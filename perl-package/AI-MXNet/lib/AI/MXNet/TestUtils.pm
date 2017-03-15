@@ -23,7 +23,7 @@ Test if two pdl arrays are the same
 
 func same(PDL $a, PDL $b)
 {
-    return not which($a - $b)->shape->at(0);
+    return ($a != $b)->sum == 0;
 }
 
 =head2 reldiff
