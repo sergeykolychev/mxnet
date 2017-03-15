@@ -184,7 +184,7 @@ func check_consistency(
     Num                                 :$scale=1,
     Str|ArrayRef[Str]|HashRef[Str]      :$grad_req='write',
     Maybe[HashRef[AI::MXNet::NDArray]]  :$arg_params=,
-    Maybe[hashRef[AI::MXNet::NDArray]]  :$aux_params=,
+    Maybe[HashRef[AI::MXNet::NDArray]]  :$aux_params=,
     Maybe[HashRef[Num]|Num]             :$tol=,
     Bool                                :$raise_on_err=1,
     Maybe[AI::MXNer::NDArray]           :$ground_truth=
@@ -225,7 +225,7 @@ func check_consistency(
     }, $sym, $ctx_list);
     $arg_params //= {};
     $aux_params //= {};
-    my %arg_dict = %{ $exe_list->[0]->arg_dict };
+    my %arg_dict = %{ $exe_list[0]->arg_dict };
     while(my ($n, $arr) = each %arg_dict)
     {
         if(not exists $arg_params->{$n})
@@ -233,7 +233,7 @@ func check_consistency(
             $arg_params->{$n} = random(reverse @{ $arr->shape })*$scale;
         }
     }
-    my %aux_dict = %{ $exe_list->[0]->aux_dict };
+    my %aux_dict = %{ $exe_list[0]->aux_dict };
     while(my ($n, $arr) = each %aux_dict)
     {
         if(not exists $aux_params->{$n})
@@ -259,10 +259,10 @@ func check_consistency(
     my $gt = $ground_truth;
     if(not defined $gt)
     {
-        $gt = { %{ $exe_list->[$max_idx]->output_dict } };
+        $gt = { %{ $exe_list[$max_idx]->output_dict } };
         if($grad_req ne 'null')
         {
-            %{$gt} = (%{$gt}, %{ $exe_list->[$max_idx]->grad_dict });
+            %{$gt} = (%{$gt}, %{ $exe_list[$max_idx]->grad_dict });
         }
     }
 
@@ -300,7 +300,7 @@ func check_consistency(
         }
         enumerate(sub {
             my ($i, $exe) = @_;
-            return if($i == $max_ind);
+            return if($i == $max_idx);
             zip(sub {
                 my ($name, $arr) = @_;
                 if (not defined $gt->{$name})
