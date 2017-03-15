@@ -77,6 +77,9 @@ sub test_save_load
     is($mod->_symbol->tojson(), $mod2->_symbol->tojson());
     $dict_equ->(($mod->get_params())[0], ($mod2->get_params())[0]);
     $dict_equ->($mod->_kvstore->_updater->states, $mod2->_updater->states);
+    unlink('test-0000.params');
+    unlink('test-0000.states');
+    unlink('test-symbol.json');
 }
 
 

@@ -336,7 +336,7 @@ method aux_dict()
 
 method output_dict()
 {
-    if(not defined $self->_ouput_dict)
+    if(not defined $self->_output_dict)
     {
         $self->_output_dict(_get_dict(
                 $self->_symbol->list_outputs(),
