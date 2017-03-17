@@ -1474,6 +1474,7 @@ method unroll(
 
 package AI::MXNet::RNN::ModifierCell;
 use Mouse;
+use AI::MXNet::Base;
 extends 'AI::MXNet::RNN::Cell::Base';
 
 =head1 NAME
@@ -1497,7 +1498,11 @@ has 'base_cell' => (is => 'ro', isa => 'AI::MXNet::RNN::Cell::Base', required =>
 around BUILDARGS => sub {
     my $orig  = shift;
     my $class = shift;
-    return $class->$orig(base_cell => $_[0]) if @_ == 1;
+    if(@_%2)
+    {
+        my $base_cell = shift;
+        return $class->$orig(base_cell => $base_cell, @_);
+    }
     return $class->$orig(@_);
 };
 
@@ -1521,7 +1526,7 @@ method state_shape()
 method begin_state(CodeRef :$init_sym=AI::MXNet::Symbol->can('zeros'), @kwargs)
 {
     assert(
-        not $self->_modified,
+        (not $self->_modified),
         "After applying modifier cells (e.g. DropoutCell) the base "
         ."cell cannot be called directly. Call the modifier cell instead."
     );
