@@ -16,7 +16,7 @@ AI::MXNet::Module::Bucketing
 
 =head1 DESCRIPTION
 
-    Implements the AI::MXNet::Module::Base API, and allows multiple
+Implements the AI::MXNet::Module::Base API, and allows multiple
 symbols to be used depending on the `bucket_key` provided by each different
 mini-batch of data
 =cut
@@ -54,6 +54,7 @@ has '_context'            => (
 );
 has '_work_load_list'     => (is => 'rw', init_arg => 'work_load_list', isa => 'ArrayRef[Num]');
 has '_curr_module'        => (is => 'rw', init_arg => undef);
+has '_curr_bucket_key'    => (is => 'rw', init_arg => undef);
 has '_buckets'            => (is => 'rw', init_arg => undef, default => sub { +{} });
 has '_fixed_param_names'  => (is => 'rw', isa => 'ArrayRef[Str]', init_arg => 'fixed_param_names');
 has '_state_names'        => (is => 'rw', isa => 'ArrayRef[Str]', init_arg => 'state_names');
@@ -77,6 +78,7 @@ method _reset_bind()
     $self->binded(0);
     $self->_buckets({});
     $self->_curr_module(undef);
+    $self->_curr_bucket_key(undef);
 }
 
 =head2 data_names
@@ -359,6 +361,7 @@ method bind(
         grad_req         => $grad_req
     );
     $self->_curr_module($module);
+    $self->_curr_bucket_key($self->_default_bucket_key);
     $self->_buckets->{ $self->_default_bucket_key } = $module;
 
     # copy back saved params, if already initialized
@@ -376,14 +379,14 @@ method bind(
         ----------
         bucket_key : str (or any perl object that overloads "" op)
             The key of the target bucket.
-        data_shapes : ArrayRef[AI::MXNet::DataDesc|NameShape]
+        data_shapes :  Maybe[ArrayRef[AI::MXNet::DataDesc|NameShape]]
             Typically `data_batch.provide_data`.
         label_shapes : Maybe[ArrayRef[AI::MXNet::DataDesc|NameShape]]
             Typically `data_batch.provide_label`.
 =cut
 
 method switch_bucket(
-    ArrayRef[AI::MXNet::DataDesc|NameShape]                   :$data_shapes,
+    Maybe[ArrayRef[AI::MXNet::DataDesc|NameShape]]            :$data_shapes=,
     Maybe[ArrayRef[AI::MXNet::DataDesc|NameShape]]            :$label_shapes=,
                                                               :$bucket_key
 )
@@ -411,6 +414,7 @@ method switch_bucket(
         $self->_buckets->{ $bucket_key } = $module;
     }
     $self->_curr_module($self->_buckets->{ $bucket_key });
+    $self->_curr_bucket_key($bucket_key);
 }
 
 =head2  init_optimizer
@@ -458,6 +462,29 @@ method init_optimizer(
         }
     }
     $self->optimizer_initialized(1);
+}
+
+=head2 prepare
+
+Prepare a data batch for forward.
+
+Parameters
+----------
+$data_batch : AI::MXNet::DataBatch
+=cut
+
+method prepare(AI::MXNet::DataBatch $data_batch)
+{
+    assert($self->binded and $self->params_initialized);
+    ## perform bind if have not done so yet
+    my $original_bucket_key = $self->_curr_bucket_key;
+    $self->switch_bucket(
+        bucket_key   => $data_batch->bucket_key,
+        data_shapes  => $data_batch->provide_data,
+        label_shapes => $data_batch->provide_label
+    );
+    # switch back
+    $self->switch_bucket($original_bucket_key);
 }
 
 =head2 forward

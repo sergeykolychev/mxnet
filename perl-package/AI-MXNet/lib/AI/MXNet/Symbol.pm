@@ -1064,7 +1064,50 @@ method bind(
     return $executor;
 }
 
+=head2 eval
+
+Evaluate a symbol given arguments
+
+The `eval` method combines a call to `bind` (which returns an executor)
+with a call to `forward` (executor method).
+For the common use case, where you might repeatedly evaluate with same arguments,
+eval is slow.
+In that case, you should call `bind` once and then repeatedly call forward.
+Eval allows simpler syntax for less cumbersome introspection.
+
+Parameters
+----------
+:$ctx : Context
+The device context the generated executor to run on.
+Optional, defaults to cpu(0)
+
+:$args array ref of NDArray or hash ref of NDArray
+
+- If the type is an array ref of NDArray, the position is in the same order of list_arguments.
+- If the type is a hash of str to NDArray, then it maps the name of the argument
+  to the corresponding NDArray.
+- In either case, all arguments must be provided.
+
+Returns
+----------
+result :  an array ref of NDArrays corresponding to the values
+taken by each symbol when evaluated on given args.
+When called on a single symbol (not a group),
+the result will be an array ref with one element.
+
+Examples:
+my $result = $symbol->(ctx => mx->gpu, args => {data => mx->nd->ones([5,5])});
+my $result = $symbol->(args => {data => mx->nd->ones([5,5])});
+
+=cut
+
+method eval(:$ctx=AI::MXNet::Context->cpu, HashRef[AI::MXNet::NDArray]|ArrayRef[AI::MXNet::NDArray] :$args)
+{
+    return $self->bind(ctx => $ctx, args => $args)->forward;
+}
+
 =head2  grad
+
         Get the autodiff of current symbol.
 
         This function can only be used if current symbol is a loss function.

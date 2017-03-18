@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-use Test::More tests => 1203;
+use Test::More tests => 2283;
 use AI::MXNet qw(mx);
 use AI::MXNet::TestUtils qw(reldiff pdl_maximum pdl_minimum);
 use PDL;
@@ -72,6 +72,15 @@ sub check_bind_with_uniform
 
 sub test_bind
 {
+    my ($disable_bulk_exec) = @_;
+    my ($prev_fwd_var, $prev_bwd_var);
+    if($disable_bulk_exec)
+    {
+        $prev_fwd_var = $ENV{MXNET_EXEC_BULK_FWD_THRESHOLD_TRAIN}//1;
+        $prev_bwd_var = $ENV{MXNET_EXEC_BULK_BWD_TRAIN}//1;
+        $ENV{MXNET_EXEC_BULK_FWD_THRESHOLD_TRAIN} = 0;
+        $ENV{MXNET_EXEC_BULK_BWD_TRAIN} = 0;
+    }
     srand(0);
     my $nrepeat = 9;
     my $maxdim = 3;
@@ -100,6 +109,11 @@ sub test_bind
                                     $dim,
                                     sub { $_[0]->minimum($_[1]) });
         }
+    }
+    if($disable_bulk_exec)
+    {
+        $ENV{MXNET_EXEC_BULK_FWD_THRESHOLD_TRAIN} = $prev_fwd_var;
+        $ENV{MXNET_EXEC_BULK_BWD_TRAIN}           = $prev_bwd_var;
     }
 }
 
@@ -154,6 +168,7 @@ sub test_reshape
     ok(($new_exe->outputs->[0]->aspdl == 4)->all);
 }
 
-test_bind();
+test_bind(0);
+test_bind(1);
 test_dot();
 test_reshape();

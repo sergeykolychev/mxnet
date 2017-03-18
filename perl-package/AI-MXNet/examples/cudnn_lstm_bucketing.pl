@@ -25,6 +25,7 @@ GetOptions(
     'load-epoch=i'    => \(my $load_epoch   = 0       ),
     'stack-rnn'       => \(my $stack_rnn              ),
     'bidirectional=i' => \(my $bidirectional          ),
+    'dropout=f',      => \(my $dropout      = 0       ),
     'help'           => sub { HelpMessage(0) },
 ) or HelpMessage(1);
 
@@ -52,6 +53,7 @@ GetOptions(
     --load-epoch     load from epoch
     --stack-rnn      stack rnn to reduce communication overhead (1,0 default 0)
     --bidirectional  whether to use bidirectional layers (1,0 default 0)
+    --dropout        dropout probability (1.0 - keep probability), default 0
 =cut
 
 $bidirectional = $bidirectional ? 1 : 0;
@@ -107,11 +109,16 @@ my $train = sub
         my $stack = mx->rnn->SequentialRNNCell();
         for my $i (0..$num_layers-1)
         {
+            my $dropout_rate = 0;
+            if($i < $num_layers-1)
+            {
+                $dropout_rate = $dropout;
+            }
             $stack->add(
                 mx->rnn->FusedRNNCell(
                     $num_hidden, num_layers => 1,
                     mode => 'lstm', prefix => "lstm_$i",
-                    bidirectional => $bidirectional
+                    bidirectional => $bidirectional, dropout => $dropout_rate
                 )
             );
         }
@@ -121,7 +128,7 @@ my $train = sub
     {
         $cell = mx->rnn->FusedRNNCell(
             $num_hidden, mode => 'lstm', num_layers => $num_layers,
-            bidirectional => $bidirectional
+            bidirectional => $bidirectional, dropout => $dropout
         );
     }
 

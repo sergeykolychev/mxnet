@@ -426,7 +426,9 @@ method predict(
             If not `None`, will be used as validation set and evaluate the performance
             after each epoch.
         eval_metric : str or EvalMetric
-            Default `'acc'`. The performance measure used to display during training.
+            Default 'accuracy'. The performance measure used to display during training.
+            Other possible predefined metrics are:
+            'ce' (CrossEntropy), 'f1', 'mae', 'mse', 'rmse', 'top_k_accuracy'
         epoch_end_callback : function or list of function
             Each callback will be called with the current `epoch`, `symbol`, `arg_params`
             and `aux_params`.
@@ -525,6 +527,7 @@ method fit(
     }
     $eval_metric = AI::MXNet::Metric->create($eval_metric)
         unless blessed $eval_metric;
+
     ################################################################################
     # training loop
     ################################################################################
@@ -533,11 +536,23 @@ method fit(
         my $tic = time;
         $eval_metric->reset;
         my $nbatch = 0;
-        while(my $data_batch = <$train_data>)
+        my $end_of_batch = 0;
+        my $next_data_batch = <$train_data>;
+        while(not $end_of_batch)
         {
+            my $data_batch = $next_data_batch;
             $monitor->tic if $monitor;
             $self->forward_backward($data_batch);
             $self->update;
+            $next_data_batch = <$train_data>;
+            if(defined $next_data_batch)
+            {
+                $self->prepare($next_data_batch);
+            }
+            else
+            {
+                $end_of_batch = 1;
+            }
             $self->update_metric($eval_metric, $data_batch->label);
             $monitor->toc_print if $monitor;
             if(defined $batch_end_callback)
@@ -843,6 +858,19 @@ method set_states(Maybe[ArrayRef[ArrayRef[AI::MXNet::NDArray]]] $states=, Maybe[
 =cut
 
 method install_monitor(AI::MXNet::Monitor $mon) { confess("NotImplemented") }
+
+=head2 prepare
+
+Prepare the module for processing a data batch.
+
+Usually involves switching bucket and reshaping.
+
+Parameters
+----------
+$data_batch : AI::MXNet::DataBatch
+=cut
+
+method prepare(AI::MXNet::DataBatch $data_batch){}
 
 ################################################################################
 # Computations
