@@ -24,6 +24,7 @@ use AI::MXNet::Module;
 use AI::MXNet::Module::Bucketing;
 use AI::MXNet::RNN;
 use AI::MXNet::Visualization;
+use AI::MXNet::RecordIO;
 our $VERSION = '0.03';
 
 sub import
