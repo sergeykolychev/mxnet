@@ -464,7 +464,8 @@ extends 'AI::MXNet::RNN::Cell::Base';
         created if undef.
 =cut
 
-has '_num_hidden'   => (is => 'ro', init_arg => 'num_hidden', isa => 'Int', required => 1);
+has '_num_hidden'  => (is => 'ro', init_arg => 'num_hidden', isa => 'Int', required => 1);
+has 'forget_bias'  => (is => 'ro', isa => 'Num');
 has '_activation'  => (
     is       => 'ro',
     init_arg => 'activation',
@@ -486,7 +487,15 @@ sub BUILD
 {
     my $self = shift;
     $self->_iW($self->params->get('i2h_weight'));
-    $self->_iB($self->params->get('i2h_bias'));
+    $self->_iB(
+        $self->params->get(
+            'i2h_bias',
+            (defined($self->forget_bias)
+                ? (init => AI::MXNet::LSTMBias->new(forget_bias => $self->forget_bias))
+                : ()
+            )
+        )
+    );
     $self->_hW($self->params->get('h2h_weight'));
     $self->_hB($self->params->get('h2h_bias'));
 }
@@ -570,10 +579,13 @@ extends 'AI::MXNet::RNN::Cell';
     params : AI::MXNet::RNN::Params or None
         container for weight sharing between cells.
         created if undef.
+    forget_bias : bias added to forget gate, default 1.0.
+        Jozefowicz et al. 2015 recommends setting this to 1.0
 =cut
 
 has '+_prefix'     => (default => 'lstm_');
 has '+_activation' => (init_arg => undef);
+has '+forget_bias' => (is => 'ro', isa => 'Num', default => 1);
 
 =head2 state_shape
 
@@ -779,6 +791,7 @@ has '_num_layers'      => (is => 'ro', isa => 'Int',  init_arg => 'num_layers', 
 has '_dropout'         => (is => 'ro', isa => 'Num',  init_arg => 'dropout',        default => 0);
 has '_get_next_state'  => (is => 'ro', isa => 'Bool', init_arg => 'get_next_state', default => 0);
 has '_bidirectional'   => (is => 'ro', isa => 'Bool', init_arg => 'bidirectional',  default => 0);
+has 'forget_bias'      => (is => 'ro', isa => 'Num',  default => 1);
 has 'initializer'      => (is => 'rw', isa => 'Maybe[AI::MXNet::Initializer]');
 has '_mode'            => (
     is => 'ro',
@@ -820,7 +833,8 @@ sub BUILD
                 num_hidden     => $self->_num_hidden,
                 num_layers     => $self->_num_layers,
                 mode           => $self->_mode,
-                bidirectional  => $self->_bidirectional
+                bidirectional  => $self->_bidirectional,
+                forget_bias    => $self->forget_bias
             )
         );
     }

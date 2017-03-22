@@ -624,6 +624,36 @@ method _init_weight($name, $arr)
 
 __PACKAGE__->register;
 
+package AI::MXNet::LSTMBias;
+
+=head1 NAME
+
+    AI::MXNet::LSTMBias - Initialize all bias of an LSTMCell to 0.0 except for
+    the forget gate whose bias is set to custom value.
+
+=head2 new
+
+Parameters
+----------
+forget_bias: float, bias for the forget gate.
+Jozefowicz et al. 2015 recommends setting this to 1.0.
+=cut
+
+use Mouse;
+extends 'AI::MXNet::Initializer';
+has 'forget_bias' => (is => 'ro', isa => 'Num', required => 1);
+
+method _init_weight(Str $name, AI::MXNet::NDArray $arr)
+{
+    $arr .= 0;
+    # in the case of LSTMCell the forget gate is the second
+    # gate of the 4 LSTM gates, we modify the according values.
+    my $num_hidden = int($arr->shape->[0] / 4);
+    $arr->slice([$num_hidden, 2*$num_hidden-1]) .= $self->forget_bias;
+}
+
+__PACKAGE__->register;
+
 package AI::MXNet::FusedRNN;
 use Mouse;
 use JSON::PP;
@@ -635,7 +665,7 @@ AI::MXNet::FusedRNN
 
 =head1 DESCRIPTION
 
-    Initialze parameters for fused rnn layer
+    Initialize parameters for fused rnn layer
 
     Parameters
     ----------
@@ -649,9 +679,12 @@ AI::MXNet::FusedRNN
         should be the same with arguments passed to FusedRNNCell.
     bidirectional : bool
         should be the same with arguments passed to FusedRNNCell.
+    forget_bias : float
+        should be the same with arguments passed to FusedRNNCell.
 =cut
 
 has 'init'          => (is => 'rw', isa => 'Str|AI::MXNet::Initializer', required => 1);
+has 'forget_bias'   => (is => 'ro', isa => 'Num', default => 1);
 has [qw/num_hidden
        num_layers/] => (is => 'ro', isa => 'Int', required => 1);
 has 'mode'          => (is => 'ro', isa => 'Str', required => 1);
@@ -678,14 +711,24 @@ method _init_weight($name, $arr)
         num_layers    => $self->num_layers,
         mode          => $self->mode,
         bidirectional => $self->bidirectional,
+        forget_bias   => $self->forget_bias,
         prefix        => ''
     );
 
     my $args = $cell->unpack_weights({ parameters => $arr });
     for my $name (keys %{ $args })
     {
-       my $desc = AI::MXNet::InitDesc->new(name => $name);
-       &{$self->init}($desc, $args->{$name});
+        my $desc = AI::MXNet::InitDesc->new(name => $name);
+        # for lstm bias, we use a custom initializer
+        # which adds a bias to the forget gate
+        if($self->_mode eq 'lstm' and $name =~ /f_bias$/)
+        {
+            $args->{$name} .= $self->forget_bias;
+        }
+        else
+        {
+            &{$self->init}($desc, $args->{$name});
+        }
     }
 
     $arr .= $cell->pack_weights($args)->{parameters};

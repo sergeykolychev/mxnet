@@ -274,6 +274,7 @@ method next()
         data          => [$data],
         label         => [$label],
         bucket_key    => $self->buckets->[$i],
+        pad           => 0,
         provide_data  => [
             AI::MXNet::DataDesc->new(
                 name  => $self->data_name,

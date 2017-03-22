@@ -822,6 +822,10 @@ method init_optimizer(
         $self->logger->warning('optimizer already initialized, ignoring...');
         return;
     }
+    if($self->_p->_params_dirty)
+    {
+        $self->_sync_params_from_devices;
+    }
 
     my ($kvstore, $update_on_kvstore) = _create_kvstore(
         $kvstore,
