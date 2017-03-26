@@ -26,6 +26,7 @@ use AI::MXNet::RNN;
 use AI::MXNet::Visualization;
 use AI::MXNet::RecordIO;
 use AI::MXNet::Image;
+use AI::MXNet::Contrib;
 our $VERSION = '0.03';
 
 sub import
@@ -60,6 +61,7 @@ sub import
             sub rnn { 'AI::MXNet::RNN' }
             sub callback { 'AI::MXNet::Callback' }
             sub img { 'AI::MXNet::Image' }
+            sub contrib { 'AI::MXNet::Contrib' }
             sub AttrScope { shift; AI::MXNet::Symbol::AttrScope->new(\@_) }
             *AI::MXNet::Symbol::AttrScope::current = sub { \$${short_name}::AttrScope; };
             \$${short_name}::AttrScope = AI::MXNet::Symbol::AttrScope->new;
