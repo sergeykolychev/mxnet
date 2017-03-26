@@ -1,27 +1,4 @@
-# pylint: disable=no-member, too-many-lines, redefined-builtin, protected-access, unused-import, invalid-name
-# pylint: disable=too-many-arguments, too-many-locals, no-name-in-module, too-many-branches, too-many-statements
-"""Read invidual image files and perform augmentations."""
-
-from __future__ import absolute_import, print_function
-
-import os
-import random
-import logging
-import numpy as np
-from .base import numeric_types
-
-try:
-    import cv2
-except ImportError:
-    cv2 = None
-
-from . import ndarray as nd
-from . import _ndarray_internal as _internal
-from ._ndarray_internal import _cvimresize as imresize
-from ._ndarray_internal import _cvcopyMakeBorder as copyMakeBorder
-from . import io
-from . import recordio
-package AI::MXNet:Image;
+package AI::MXNet::Image;
 use strict;
 use warnings;
 use Scalar::Util qw(blessed);
@@ -81,7 +58,7 @@ Returns:
 
 method scale_down(Shape $src_size, Shape $size)
 {
-    my ($w, $h = @{ $size };
+    my ($w, $h) = @{ $size };
     my ($sw, $sh) = @{ $src_size };
     if($sh < $h)
     {
@@ -164,7 +141,7 @@ Returns:
 
 method random_crop(AI::MXNet::NDArray $src, Shape $size, Int $interp=2)
 {
-    my ($mh, $w) = @{ $src->shape };
+    my ($h, $w) = @{ $src->shape };
     my ($new_w, $new_h) = __PACKAGE__->scale_down([$w, $h], $size);
 
     my $x0 = int(rand($w - $new_w + 1));
@@ -215,7 +192,7 @@ AI::MXNet::NDArray $normalized_image
 
 method color_normalize(AI::MXNet::NDArray $src, Num|AI::MXNet::NDArray $mean, Maybe[Num|AI::MXNet::NDArray] $std=)
 {
-    $src -= mean;
+    $src -= $mean;
     if(defined $std)
     {
         $src /= $std;
@@ -230,7 +207,7 @@ Randomly crop src with size. Randomize area and aspect ratio
 Parameters:
 AI::MXNet::NDArray $src
 Shape              $size
-Int                $min_area
+Num                $min_area
 ArrayRef[Int]      [$from, $to] # $ratio
 Maybe[Int]         $interp=2
 
@@ -238,7 +215,7 @@ Returns:
 ($cropped_image, [$x0, $y0, $new_w, $new_h])
 =cut
 
-method random_size_crop(AI::MXNet::NDArray $src, Shape $size, Int $min_area, ArrayRef[Int] $ratio, Maybe[Int] $interp=2)
+method random_size_crop(AI::MXNet::NDArray $src, Shape $size, Num $min_area, ArrayRef[Num] $ratio, Maybe[Int] $interp=2)
 {
     my ($h, $w) = @{ $src->shape };
     my ($from, $to) = @{ $ratio };
@@ -267,7 +244,7 @@ method random_size_crop(AI::MXNet::NDArray $src, Shape $size, Int $min_area, Arr
     my $y0 = int(rand($h - $new_h + 1));
 
     my $out = __PACKAGE__->fixed_crop($src, $x0, $y0, $new_w, $new_h, $size, $interp);
-    return [$out, ($x0, $y0, $new_w, $new_h]);
+    return ($out, [$x0, $y0, $new_w, $new_h]);
 }
 
 =head2 ResizeAug
@@ -320,8 +297,8 @@ Makes "random crop augumenter" closure
 
 Parameters:
 Shape              $size
-Int                $min_area
-ArrayRef[Int]      $ratio
+Num                $min_area
+ArrayRef[Num]      $ratio
 Int                $interp=2
 
 Returns:
@@ -329,7 +306,7 @@ CodeRef that accepts AI::MXNet::NDArray $src as input
 and returns [(__PACKAGE__->random_size_crop($src, $size, $min_area, $ratio, $interp))[0]]
 =cut
 
-method RandomSizedCropAug(Shape $size, Int $min_area, ArrayRef[Int] $ratio, Int $interp=2)
+method RandomSizedCropAug(Shape $size, Num $min_area, ArrayRef[Num] $ratio, Int $interp=2)
 {
     my $aug = sub {
         my $src = shift;
@@ -376,7 +353,7 @@ method RandomOrderAug(ArrayRef[CodeRef] $ts)
 {
     my $aug = sub {
         my $src = shift;
-        my @ts = List::Util::shuffle(@{ $ts })
+        my @ts = List::Util::shuffle(@{ $ts });
         my @tmp;
         for my $t (@ts)
         {
@@ -409,7 +386,7 @@ method ColorJitterAug(Num $brightness, Num $contrast, Num $saturation)
     {
         my $baug = sub { my $src = shift;
             my $alpha = 1 + -$brightness + 2 * $brightness * rand;
-            $src *= $alpha
+            $src *= $alpha;
             return [$src];
         };
         push @ts, $baug;
@@ -421,7 +398,7 @@ method ColorJitterAug(Num $brightness, Num $contrast, Num $saturation)
             my $alpha = 1 + -$contrast + 2 * $contrast * rand;
             my $gray  = $src*$coef;
             $gray = (3.0*(1.0-$alpha)/$gray->size)*$gray->sum;
-            $src *= $alpha
+            $src *= $alpha;
             $src += $gray;
             return [$src];
         };
@@ -459,7 +436,8 @@ CodeRef that accepts AI::MXNet::NDArray $src as input
 and returns ArrayRef[AI::MXNet::NDArray]
 =cut
 
-def LightingAug(Num $alphastd, PDL $eigval, PDL $eigvec)
+method LightingAug(Num $alphastd, PDL $eigval, PDL $eigvec)
+{
     my $aug = sub { my $src = shift;
         my $alpha = AI::MXNet::NDArray->zeros([3]);
         AI::MXNet::Random->normal(0, $alphastd, { out => $alpha });
@@ -508,7 +486,7 @@ and returns [$p > rand ? AI::MXNet::NDArray->flip($src, axis=1>) : $src]
 method HorizontalFlipAug(Num $p)
 {
     my $aug = sub { my $src = shift;
-        return [$p > rand ? AI::MXNet::NDArray->flip($src, axis=1>) : $src]
+        return [$p > rand() ? AI::MXNet::NDArray->flip($src, { axis=>1 }) : $src]
     };
     return $aug;
 }
@@ -577,7 +555,7 @@ Int            :$inter_method=2
     if($rand_resize)
     {
         assert($rand_crop);
-        push @auglist, __PACKAGE__->RandomSizedCropAug($crop_size, 0.3, (3.0/4.0, 4.0/3.0), $inter_method);
+        push @auglist, __PACKAGE__->RandomSizedCropAug($crop_size, 0.3, [3.0/4.0, 4.0/3.0], $inter_method);
     }
     elsif($rand_crop)
     {
@@ -593,7 +571,7 @@ Int            :$inter_method=2
         push @auglist, __PACKAGE__->HorizontalFlipAug(0.5);
     }
 
-    push @auglist, __PACKAGE_->CastAug;
+    push @auglist, __PACKAGE__->CastAug;
 
     if($brightness or $contrast or $saturation)
     {
@@ -625,9 +603,11 @@ Int            :$inter_method=2
     return \@auglist;
 }
 
+method ImageIter(@args) { AI::MXNet::ImageIter->new(@args) }
 
 package AI::MXNet::ImageIter;
 use Mouse;
+use AI::MXNet::Base;
 extends 'AI::MXNet::DataIter';
 
 =head1 NAME
@@ -676,7 +656,7 @@ part_index : int
     Partition index
 num_parts : int
     Total number of partitions.
-kwargs : ...
+kwargs : hash ref with any additional arguments for augmenters
 =cut
 
 has 'batch_size'  => (is => 'ro', isa => 'Int',   required => 1);
@@ -687,141 +667,217 @@ has [qw/path_imgrec
         path_root
         path_imgidx
     /]            => (is => 'ro', isa => 'Str');
+has 'shuffle'     => (is => 'ro', isa => 'Bool', default => 0);
+has 'part_index'  => (is => 'ro', isa => 'Int', default => 0);
+has 'num_parts'   => (is => 'ro', isa => 'Int', default => 0);
+has 'aug_list'    => (is => 'rw', isa => 'ArrayRef[CodeRef]');
+has 'imglist'     => (is => 'rw', isa => 'ArrayRef|HashRef');
+has 'kwargs'      => (is => 'ro', isa => 'HashRef');
+has [qw/imgidx
+        imgrec
+        seq
+        cur
+        provide_data
+        provide_label
+           /]     => (is => 'rw', init_arg => undef);
 
-    def __init__(self, batch_size, data_shape, label_width=1,
-                 path_imgrec=None, path_imglist=None, path_root=None, path_imgidx=None,
-                 shuffle=False, part_index=0, num_parts=1, aug_list=None, imglist=None, **kwargs):
-        super(ImageIter, self).__init__()
-        assert(path_imgrec or path_imglist or (isinstance(imglist, list)))
-        if path_imgrec:
-            print('loading recordio...')
-            if path_imgidx:
-                self.imgrec = recordio.MXIndexedRecordIO(path_imgidx, path_imgrec, 'r')
-                self.imgidx = list(self.imgrec.keys)
-            else:
-                self.imgrec = recordio.MXRecordIO(path_imgrec, 'r') # pylint: disable=redefined-variable-type
-                self.imgidx = None
-        else:
-            self.imgrec = None
+sub BUILD
+{
+    my $self = shift;
+    assert($self->path_imgrec or $self->path_imglist or ref $self->imglist eq 'ARRAY');
+    if($self->path_imgrec)
+    {
+        print("loading recordio...\n");
+        if($self->path_imgidx)
+        {
+            $self->imgrec(
+                AI::MXNet::IndexedRecordIO->new(
+                    idx_path => $self->path_imgidx,
+                    uri => $self->path_imgrec,
+                    flag => 'r'
+                )
+            );
+            $self->imgidx([@{ $self->imgrec->keys }]);
+        }
+        else
+        {
+            $self->imgrec(AI::MXNet::RecordIO->new(uri => $self->path_imgrec, flag => 'r'));
+        }
+    }
+    my %imglist;
+    my @imgkeys;
+    if($self->path_imglist)
+    {
+        print("loading image list...\n");
+        open(my $f, $self->path_imglist) or confess("can't open ${\ $self->path_imglist } : $!");
+        while(my $line = <$f>)
+        {
+            chomp($line);
+            my @line = split(/\t/, $line);
+            my $label = AI::MXNet::NDArray->array([@line[1..@line-1]]);
+            my $key   = $line[0];
+            $imglist{$key} = [$label, $line[-1]];
+            push @imgkeys, $key;
+        }
+        $self->imglist(\%imglist);
+    }
+    elsif(ref $self->imglist eq 'ARRAY')
+    {
+        print("loading image list...\n");
+        my %result;
+        my $index = 1;
+        for my $img (@{ $self->imglist })
+        {
+            my $key = $index++;
+            my $label;
+            if(not ref $img->[0])
+            {
+                $label = AI::MXNet::NDArray->array([$img->[0]]);
+            }
+            else
+            {
+                $label = AI::MXNet::NDArray->array($img->[0]);
+                $result{$key} = [$label, $img->[1]];
+                push @imgkeys, $key;
+            }
+        }
+        $self->imglist(\%result);
+    }
+    assert(@{ $self->data_shape } == 3 and $self->data_shape->[0] == 3);
+    $self->provide_data([
+        AI::MXNet::DataDesc->new(
+            name  => 'data',
+            shape => [$self->batch_size, @{ $self->data_shape }]
+        )
+    ]);
+    if($self->label_width > 1)
+    {
+        $self->provide_label([
+            AI::MXNet::DataDesc->new(
+                name  => 'softmax_label',
+                shape => [$self->batch_size, $self->label_width]
+            )
+        ]);
+    }
+    else
+    {
+        $self->provide_label([
+            AI::MXNet::DataDesc->new(
+                name  => 'softmax_label',
+                shape => [$self->batch_size]
+            )
+        ]);
+    }
+    if(not defined $self->imgrec)
+    {
+        $self->seq(\@imgkeys);
+    }
+    elsif($self->shuffle or $self->num_parts > 1)
+    {
+        assert(defined $self->imgidx);
+        $self->seq($self->imgidx);
+    }
+    if($self->num_parts > 1)
+    {
+        assert($self->part_index < $self->num_parts);
+        my $N = @{ $self->seq };
+        my $C = $N/$self->num_parts;
+        $self->seq([@{ $self->seq }[$self->part_index*$C..($self->part_index+1)*$C-1]]);
+    }
+    if(defined $self->aug_list or defined $self->kwargs)
+    {
+        $self->aug_list(AI::MXNet::Image->CreateAugmenter(data_shape => $self->data_shape, %{ $self->kwargs//{} }));
+    }
+    $self->cur(0);
+    $self->reset();
+}
 
-        if path_imglist:
-            print('loading image list...')
-            with open(path_imglist) as fin:
-                imglist = {}
-                imgkeys = []
-                for line in iter(fin.readline, ''):
-                    line = line.strip().split('\t')
-                    label = nd.array([float(i) for i in line[1:-1]])
-                    key = int(line[0])
-                    imglist[key] = (label, line[-1])
-                    imgkeys.append(key)
-                self.imglist = imglist
-        elif isinstance(imglist, list):
-            print('loading image list...')
-            result = {}
-            imgkeys = []
-            index = 1
-            for img in imglist:
-                key = str(index) # pylint: disable=redefined-variable-type
-                index += 1
-                if isinstance(img[0], numeric_types):
-                    label = nd.array([img[0]])
-                else:
-                    label = nd.array(img[0])
-                result[key] = (label, img[1])
-                imgkeys.append(str(key))
-            self.imglist = result
-        else:
-            self.imglist = None
-        self.path_root = path_root
+method reset
+{
+    if($self->shuffle)
+    {
+        @{ $self->seq } = List::Util::shuffle(@{ $self->seq });
+    }
+    if(defined $self->imgrec)
+    {
+        $self->imgrec->reset;
+    }
+    $self->cur(0);
+}
 
-        assert len(data_shape) == 3 and data_shape[0] == 3
-        self.provide_data = [('data', (batch_size,) + data_shape)]
-        if label_width > 1:
-            self.provide_label = [('softmax_label', (batch_size, label_width))]
-        else:
-            self.provide_label = [('softmax_label', (batch_size,))]
-        self.batch_size = batch_size
-        self.data_shape = data_shape
-        self.label_width = label_width
+method next_sample()
+{
+    if(defined $self->seq)
+    {
+        return undef if($self->cur >= @{ $self->seq });
+        my $idx = $self->seq->[$self->cur];
+        $self->cur($self->cur + 1);
+        if(defined $self->imgrec)
+        {
+            my $s = $self->imgrec->read_idx($idx);
+            my ($header, $img) = AI::MXNet::RecordIO->unpack($s);
+            if(not defined $self->imglist)
+            {
+                return ($header->label, $img);
+            }
+            else
+            {
+                return ($self->imglist->{$idx}[0], $img);
+            }
+        }
+        else
+        {
+            my ($label, $fname) = $self->imglist->{$idx};
+            if(not defined $self->imgrec)
+            {
+                open(F, $self->path_root . "/$fname") or confess("can't open $fname $!");
+                my $img;
+                { local $/ = undef; $img = <F> };
+                close(F);
+                return ($label, $img);
+            }
+        }
+    }
+    else
+    {
+        my $s = $self->imgrec->read;
+        return undef if(not defined $s);
+        my ($header, $img) = AI::MXNet::RecordIO->unpack($s);
+        return ($header->label, $img)
+    }
+}
 
-        self.shuffle = shuffle
-        if self.imgrec is None:
-            self.seq = imgkeys
-        elif shuffle or num_parts > 1:
-            assert self.imgidx is not None
-            self.seq = self.imgidx
-        else:
-            self.seq = None
+method next()
+{
+    my $batch_size = $self->batch_size;
+    my ($c, $h, $w) = @{ $self->data_shape };
+    my $batch_data  = AI::MXNet::NDArray->empty([$batch_size, $c, $h, $w]);
+    my $batch_label = AI::MXNet::NDArray->empty(@{$self->provide_label->[0]}[1]);
+    my $i = 0;
+    while ($i < $batch_size)
+    {
+        my ($label, $s) = $self->next_sample;
+        last if not defined $label;
+        my $data = [AI::MXNet::Image->imdecode($s)];
+        if(@{ $data->[0]->shape } == 0)
+        {
+            AI::MXNet::Logging->debug('Invalid image, skipping.');
+            next;
+        }
+        for my $aug (@{ $self->aug_list })
+        {
+            $data = [map { @{ $aug->($_) } } @$data];
+        }
+        for my $d (@$data)
+        {
+            assert(($i < $batch_size), 'Batch size must be multiples of augmenter output length');
+            $batch_data->at($i)  .= AI::MXNet::NDArray->transpose($d, { axes=>[2, 0, 1] });
+            $batch_label->at($i) .= $label;
+            $i++;
+        }
+    }
+    return undef if not $i;
+    return AI::MXNet::DataBatch->new(data=>[$batch_data], label=>[$batch_label], pad => $batch_size-$i);
+}
 
-        if num_parts > 1:
-            assert part_index < num_parts
-            N = len(self.seq)
-            C = N/num_parts
-            self.seq = self.seq[part_index*C:(part_index+1)*C]
-        if aug_list is None:
-            self.auglist = CreateAugmenter(data_shape, **kwargs)
-        else:
-            self.auglist = aug_list
-        self.cur = 0
-        self.reset()
-
-    def reset(self):
-        if self.shuffle:
-            random.shuffle(self.seq)
-        if self.imgrec is not None:
-            self.imgrec.reset()
-        self.cur = 0
-
-    def next_sample(self):
-        """helper function for reading in next sample"""
-        if self.seq is not None:
-            if self.cur >= len(self.seq):
-                raise StopIteration
-            idx = self.seq[self.cur]
-            self.cur += 1
-            if self.imgrec is not None:
-                s = self.imgrec.read_idx(idx)
-                header, img = recordio.unpack(s)
-                if self.imglist is None:
-                    return header.label, img
-                else:
-                    return self.imglist[idx][0], img
-            else:
-                label, fname = self.imglist[idx]
-                if self.imgrec is None:
-                    with open(os.path.join(self.path_root, fname), 'rb') as fin:
-                        img = fin.read()
-                return label, img
-        else:
-            s = self.imgrec.read()
-            if s is None:
-                raise StopIteration
-            header, img = recordio.unpack(s)
-            return header.label, img
-
-    def next(self):
-        batch_size = self.batch_size
-        c, h, w = self.data_shape
-        batch_data = nd.empty((batch_size, c, h, w))
-        batch_label = nd.empty(self.provide_label[0][1])
-        i = 0
-        try:
-            while i < batch_size:
-                label, s = self.next_sample()
-                data = [imdecode(s)]
-                if len(data[0].shape) == 0:
-                    logging.debug('Invalid image, skipping.')
-                    continue
-                for aug in self.auglist:
-                    data = [ret for src in data for ret in aug(src)]
-                for d in data:
-                    assert i < batch_size, 'Batch size must be multiples of augmenter output length'
-                    batch_data[i][:] = nd.transpose(d, axes=(2, 0, 1))
-                    batch_label[i][:] = label
-                    i += 1
-        except StopIteration:
-            if not i:
-                raise StopIteration
-
-        return io.DataBatch([batch_data], [batch_label], batch_size-i)
+1;

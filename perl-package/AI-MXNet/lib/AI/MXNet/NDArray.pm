@@ -89,15 +89,15 @@ method slice(Slice @slices)
     my $isize = @slices;
     confess("Dimensions size $dsize < slices size $isize")
         if $dsize < $isize;
-    confess("Dimensions size $dsize != slices size $isize, 
+    confess("Dimensions size $dsize != slices size $isize,
                    ndarray only supports either ->slice on dimension 0
                    or full crop")
         if $isize > 1 and $dsize != $isize;
     my $i = -1;
-    @slices = map { 
-        ++$i; 
-        ref $_ ? (@$_ == 1 ? [$_->[0], $shape->[$i] - 1] : $_) : ($_ eq 'X' ? [0, $shape->[$i] - 1] : [$_, $_]); 
-    } @slices; 
+    @slices = map {
+        ++$i;
+        ref $_ ? (@$_ == 1 ? [$_->[0], $shape->[$i] - 1] : $_) : ($_ eq 'X' ? [0, $shape->[$i] - 1] : [$_, $_]);
+    } @slices;
     zip(sub {
         my ($slice, $dim_size) = @_;
         my ($begin, $end, $stride) = @$slice;
@@ -107,7 +107,7 @@ method slice(Slice @slices)
             if $begin >= $dim_size or ($begin + $dim_size) < 0;
         confess("Dimension $i mismatch slice end : $end >= Dim Size: $dim_size")
             if $end >= $dim_size or ($end + $dim_size) < 0;
-    }, \@slices, $shape);  
+    }, \@slices, $shape);
     $i = 0;
     my ($begin, $end) = ([], []);
     for my $s (@slices)

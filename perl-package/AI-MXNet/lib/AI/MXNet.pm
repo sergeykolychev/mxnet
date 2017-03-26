@@ -25,6 +25,7 @@ use AI::MXNet::Module::Bucketing;
 use AI::MXNet::RNN;
 use AI::MXNet::Visualization;
 use AI::MXNet::RecordIO;
+use AI::MXNet::Image;
 our $VERSION = '0.03';
 
 sub import
@@ -51,12 +52,14 @@ sub import
             sub cpu { AI::MXNet::Context->cpu(\$_[1]//0) }
             sub gpu { AI::MXNet::Context->gpu(\$_[1]//0) }
             sub kv { 'AI::MXNet::KVStore' }
+            sub recordio { 'AI::MXNet::RecordIO' }
             sub io { 'AI::MXNet::IO' }
             sub metric { 'AI::MXNet::Metric' }
             sub mod { 'AI::MXNet::Module' }
             sub viz { 'AI::MXNet::Visualization' }
             sub rnn { 'AI::MXNet::RNN' }
             sub callback { 'AI::MXNet::Callback' }
+            sub img { 'AI::MXNet::Image' }
             sub AttrScope { shift; AI::MXNet::Symbol::AttrScope->new(\@_) }
             *AI::MXNet::Symbol::AttrScope::current = sub { \$${short_name}::AttrScope; };
             \$${short_name}::AttrScope = AI::MXNet::Symbol::AttrScope->new;
