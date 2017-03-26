@@ -18,11 +18,11 @@ sub run_imageiter
     );
     $data->reset();
     my $tic = time;
-    for my $i (0..$n-1)
+    for my $i (1..$n)
     {
         $data->next;
         mx->nd->waitall;
-        warn("average speed after iteration $i is " . $batch_size*$n/(time - $tic) . " samples/sec");
+        warn("average speed after iteration $i is " . $batch_size*$i/(time - $tic) . " samples/sec");
     }
 }
 
