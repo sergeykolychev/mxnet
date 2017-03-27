@@ -176,14 +176,6 @@ my $model = mx->mod->Module(
     symbol  => $net,
     context => $contexts
 );
-#my (undef, $arg_params, $aux_params) = mx->rnn->load_rnn_checkpoint($stack, 'shake', 3);
-#$model->bind(
-#    data_shapes  => $data_iter->provide_data,
-#    label_shapes => $data_iter->provide_label,
-#    for_training => 1,
-#    force_rebind => 0
-#);
-#$model->set_params($arg_params, $aux_params, allow_missing => 1);
 $model->fit(
     $data_iter,
     eval_metric         => mx->metric->Perplexity,
