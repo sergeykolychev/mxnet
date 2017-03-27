@@ -80,6 +80,23 @@ You can perform tensor or matrix computation in pure Scala:
     scala> (arr * 2).shape
     res3: ml.dmlc.mxnet.Shape = (2,3)
  ```
+
+## Perl
+
+The Perl interface is written with a goal to be highly compatible with the Python interface in order for the Python documentation
+and examples to be usable with minimal modifications:
+
+ ```perl
+    pdl> use AI::MXNet qw(mx)
+    pdl> $a = mx->nd->ones([2, 3], ctx => mx->gpu())
+    pdl> print (($a * 2)->aspdl())
+    [
+     [2 2 2]
+     [2 2 2]
+    ]
+ ```
+
+
 # Recommended Starting Tutorials
 
 * [Handwritten Digit Recognition using Convolutional Neural Networks](http://mxnet.io/tutorials/python/mnist.html) (Beginner)

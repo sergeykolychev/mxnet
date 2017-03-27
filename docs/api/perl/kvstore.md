@@ -108,6 +108,3 @@ the interface for generating a list of key-value pairs. For a single device, use
      [4 4 4]
     ]
 ```
-
-## Next Steps
-* [Scala Tutorials](http://mxnet.io/tutorials/index.html#Python-Tutorials)

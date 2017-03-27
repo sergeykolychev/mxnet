@@ -1229,8 +1229,8 @@ func _new_alloc_handle($shape, $ctx, $delay_alloc, $dtype)
 
 =head2 waitall
 
-Waits for all async operations to finish in MXNet
-This function is used for benchmark only
+Wait for all async operations to finish in MXNet.
+This function is used for benchmarks only.
 =cut
 
 method waitall()

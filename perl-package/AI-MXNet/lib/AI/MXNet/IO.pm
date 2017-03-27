@@ -409,6 +409,17 @@ has 'num_source'          => (is => 'rw', isa => 'Int');
 has 'cursor'              => (is => 'rw', isa => 'Int');
 has 'num_data'            => (is => 'rw', isa => 'Int');
 
+around BUILDARGS => sub {
+    my $orig  = shift;
+    my $class = shift;
+    if(@_%2)
+    {
+        my $data  = shift;
+        return $class->$orig(data => $data, @_);
+    }
+    return $class->$orig(@_);
+};
+
 sub BUILD
 {
     my $self  = shift;
@@ -476,7 +487,7 @@ method reset()
     }
     else
     {
-        $self->cursor = -$self->batch_size;
+        $self->cursor(-$self->batch_size);
     }
 }
 

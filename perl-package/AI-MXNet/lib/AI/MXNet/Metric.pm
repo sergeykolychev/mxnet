@@ -361,6 +361,7 @@ use AI::MXNet::Base;
 extends 'AI::MXNet::EvalMetric';
 has '+name'        => (default => 'Perplexity');
 has 'ignore_label' => (is => 'ro', isa => 'Maybe[Int]');
+has 'axis'         => (is => 'ro', isa => 'Int', default => -1);
 around BUILDARGS => sub {
     my $orig  = shift;
     my $class = shift;
@@ -375,14 +376,18 @@ AI::MXNet::Perplexity
 
 =head1 DESCRIPTION
 
-    Calculate perplexity
+Calculate perplexity.
 
-    Parameters
-    ----------
-    ignore_label : int or undef
-        index of invalid label to ignore when
-        counting. usually should be -1. Include
-        all entries if undef.
+Parameters
+----------
+ignore_label : int or undef
+    index of invalid label to ignore when
+    counting. usually should be -1. Include
+    all entries if undef.
+axis : int (default -1)
+    The axis from prediction that was used to
+    compute softmax. By default use the last
+    axis.
 =cut
 
 method update(ArrayRef[AI::MXNet::NDArray] $labels, ArrayRef[AI::MXNet::NDArray] $preds)
@@ -398,7 +403,7 @@ method update(ArrayRef[AI::MXNet::NDArray] $labels, ArrayRef[AI::MXNet::NDArray]
             "shape mismatch: (@$label_shape) vs. (@$pred_shape)"
         );
         $label = $label->as_in_context($pred->context)->astype('int32')->reshape([$label->size]);
-        $pred = AI::MXNet::NDArray->batch_take($pred, $label);
+        $pred = AI::MXNet::NDArray->pick($pred, $label, { axis => $self->axis });
         push @{ $probs }, $pred;
     }, $labels, $preds);
 

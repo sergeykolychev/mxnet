@@ -407,7 +407,7 @@ method copy_params_from(
     }
 }
 
-=head2 reshape 
+=head2 reshape
 
         Return a new executor with the same symbol and shared memory,
         but different input/output shapes.

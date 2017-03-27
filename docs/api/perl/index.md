@@ -7,7 +7,17 @@ computing and state-of-art deep learning to Perl. It enables you to write seamle
 It also lets you construct and customize the state-of-art deep learning models in Perl,
   and apply them to tasks, such as image classification and data science challenges.
 
-You can perform tensor or matrix computation in Perl with AI::MXNet:
+One important thing to internalize is that Perl interface is written to be as close as possible to the Python's API,
+so most if not all of Python's documentation and examples should just work in Perl after making few
+changes in order to make the code a bit more Perlish. In nutshell just add $ sigils and replace . = \n with -> => ; and in 99% of cases
+that's all that is needed there.
+In addition please refer to [excellent metacpan doc interface](https://metacpan.org/release/AI-MXNet) and to very detailed
+[MXNet Python API Documentation](http://mxnet.io/api/perl/docs/index.html).
+
+AI::MXNet is seamlessly glued with PDL, the C++ level state can be easily initiliazed from PDL and the results can be
+transferred to PDL objects in order to allow you to use all the glory and power of the PDL!
+
+Here is how can perform tensor or matrix computation in Perl with AI::MXNet and PDL:
 
 ```perl
    pdl> use AI::MXNet qw(mx); # creates 'mx' module on the fly with the interface close to the Python's API
@@ -37,8 +47,9 @@ You can perform tensor or matrix computation in Perl with AI::MXNet:
     [3 4]
    ]
 
-   pdl> print mx->nd->array(sequence(2,3))->aspdl ## init the NDArray from PDL but be aware that PDL methods expect the dimensions order in column major format
-        ## the dimensions ordered in the column major format, and NDArray is row major
+   ## init the NDArray from PDL but be aware that PDL methods expect the dimensions order in column major format
+   ## AI::MXNet::NDArray is row major
+   pdl> print mx->nd->array(sequence(2,3))->aspdl ## 3 rows, 2 columns
 
    [
     [0 1]
@@ -46,7 +57,6 @@ You can perform tensor or matrix computation in Perl with AI::MXNet:
     [4 5]
    ]
 ```
-
  ## Perl API Reference
  * [Module API](module.md) is a flexible high-level interface for training neural networks.
  * [Symbolic API](symbol.md) performs operations on NDArrays to assemble neural networks from layers.
@@ -54,10 +64,3 @@ You can perform tensor or matrix computation in Perl with AI::MXNet:
  * [NDArray API](ndarray.md) performs vector/matrix/tensor operations.
  * [KVStore API](kvstore.md) performs multi-GPU and multi-host distributed training.
 
-
-## Resources
-
-* [MXNet Perl API Documentation](http://mxnet.io/api/perl/docs/index.html)
-* [Handwritten Digit Classification in Perl](http://mxnet.io/tutorials/perl/mnist.html)
-* [Neural Style in Scala on MXNet](https://github.com/dmlc/mxnet/blob/master/scala-package/examples/src/main/scala/ml/dmlc/mxnet/examples/neuralstyle/NeuralStyle.scala)
-* [More Scala Examples](https://github.com/dmlc/mxnet/tree/master/scala-package/examples/src/main/scala/ml/dmlc/mxnet/examples)
