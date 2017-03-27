@@ -6,6 +6,18 @@ use AI::MXNet::NDArray::Doc;
 use Mouse;
 use AI::MXNet::Function::Parameters;
 
+=head1 NAME
+
+AI::MXNet::NDArray::Base
+=cut
+
+=head1 DESCRIPTION
+
+This module provides a convenient interface to a C++ functions
+that work with NDArray.
+Essentially it loads them up during the lib startup into the Perl space.
+=cut
+
 my %function_meta;
 method function_meta($code)
 {

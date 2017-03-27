@@ -9,17 +9,20 @@ around BUILDARGS => sub {
     return $class->$orig(attr => {@_});
 };
 
+=head1 NAME
 
-=head1
+AI::MXNet::Symbol::AttrScope - Attribute manager for local scoping.
 
-    Attribute manager for scoping.
+=head1 DESCRIPTION
 
-    User can also inherit this object to change naming behavior.
+Attribute manager for scoping.
 
-    Parameters
-    ----------
-    kwargs
-        The attributes to set for all symbol creations in the scope.
+User can also inherit this object to change naming behavior.
+
+Parameters
+----------
+kwargs
+    The attributes to set for all symbol creations in the scope.
 =cut
 
 has 'attr' => (
@@ -29,15 +32,11 @@ has 'attr' => (
 
 =head2 current
 
-        Get the attribute dict given the attribute set by the symbol.
+Get the attribute hash ref given the attribute set by the symbol.
 
-        Parameters
-        ----------
-        None.
-
-        Returns
-        -------
-        attr : current value of the class singleton object
+Returns
+-------
+attr : current value of the class singleton object
 =cut
 
 method current()
@@ -47,20 +46,20 @@ method current()
 
 =head2 get
 
-        Get the attribute dict given the attribute set by the symbol.
+Get the attribute hash ref given the attribute set by the symbol.
 
-        Parameters
-        ----------
-        attr : dict of string to string
-            The attribute passed in by user during symbol creation.
+Parameters
+----------
+$attr : Maybe[HashRef[Str]]
+    The attribute passed in by user during symbol creation.
 
-        Returns
-        -------
-        attr : dict of string to string
-            Updated attributes to add other scope related attributes.
+Returns
+-------
+$attr : HashRef[Str]
+    The attributes updated to include another the scope related attributes.
 =cut
 
-method get(HashRef[Str]|Undef $attr=)
+method get(Maybe[HashRef[Str]] $attr=)
 {
     return bless($attr//{}, 'AI::MXNet::Util::Printable') unless %{ $self->attr };
     my %ret = (%{ $self->attr }, %{ $attr//{} });

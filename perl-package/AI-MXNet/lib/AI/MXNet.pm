@@ -27,7 +27,7 @@ use AI::MXNet::Visualization;
 use AI::MXNet::RecordIO;
 use AI::MXNet::Image;
 use AI::MXNet::Contrib;
-our $VERSION = '0.03';
+our $VERSION = '0.95';
 
 sub import
 {
@@ -144,13 +144,12 @@ AI::MXNet - Perl interface to MXNet machine learning library
 
 =head1 DESCRIPTION
 
-    Perl interface to MXNet machine learning library.
+Perl interface to MXNet machine learning library.
 
 =head1 BUGS AND INCOMPATIBILITIES
 
-Parity with Python inteface is not yet achieved.
-Pod mostly contains Python documentation taken as is.
-This is WIP.
+Parity with Python inteface is mostly achieved, few deprecated
+and not often used features left unported for now.
 
 =head1 SEE ALSO
 
