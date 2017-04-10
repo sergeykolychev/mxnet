@@ -372,7 +372,7 @@ method predict(
         last if defined $num_batch and $nbatch == $num_batch;
         $self->forward($eval_batch, is_train => 0);
         my $pad = $eval_batch->pad;
-        my $outputs = [map { $_->slice([0, $_->shape0->[0]-($pad//0)-1])->copy } @{ $self->get_outputs }];
+        my $outputs = [map { $_->slice([0, $_->shape->[0]-($pad//0)-1])->copy } @{ $self->get_outputs }];
         push @output_list, $outputs;
     }
     return () unless @output_list;
