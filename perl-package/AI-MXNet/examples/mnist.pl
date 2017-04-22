@@ -137,16 +137,21 @@ sub nn_fc {
 
 sub nn_conv {
     my($data) = @_;
+    # Epoch[9] Batch [200]	Speed: 1625.07 samples/sec	Train-accuracy=0.992090
+    # Epoch[9] Batch [400]	Speed: 1630.12 samples/sec	Train-accuracy=0.992850
+    # Epoch[9] Train-accuracy=0.991357
+    # Epoch[9] Time cost=36.817
+    # Epoch[9] Validation-accuracy=0.988100
 
-    my $conv1= mx->symbol->Convolution(data => $data, name => 'conv1', num_filter => 32, kernel => [3,3], stride => [2,2]);
+    my $conv1= mx->symbol->Convolution(data => $data, name => 'conv1', num_filter => 20, kernel => [5,5], stride => [2,2]);
     my $bn1  = mx->symbol->BatchNorm(data => $conv1, name => "bn1");
     my $act1 = mx->symbol->Activation(data => $bn1, name => 'relu1', act_type => "relu");
-    my $mp1  = mx->symbol->Pooling(data => $act1, name => 'mp1', kernel => [2,2], stride =>[2,2], pool_type=>'max');
+    my $mp1  = mx->symbol->Pooling(data => $act1, name => 'mp1', kernel => [2,2], stride =>[1,1], pool_type=>'max');
 
-    my $conv2= mx->symbol->Convolution(data => $mp1, name => 'conv2', num_filter => 32, kernel=>[3,3], stride=>[2,2]);
+    my $conv2= mx->symbol->Convolution(data => $mp1, name => 'conv2', num_filter => 50, kernel=>[3,3], stride=>[2,2]);
     my $bn2  = mx->symbol->BatchNorm(data => $conv2, name=>"bn2");
     my $act2 = mx->symbol->Activation(data => $bn2, name=>'relu2', act_type=>"relu");
-    my $mp2  = mx->symbol->Pooling(data => $act2, name => 'mp2', kernel=>[2,2], stride=>[2,2], pool_type=>'max');
+    my $mp2  = mx->symbol->Pooling(data => $act2, name => 'mp2', kernel=>[2,2], stride=>[1,1], pool_type=>'max');
 
 
     my $fl   = mx->symbol->Flatten(data => $mp2, name=>"flatten");
@@ -159,9 +164,9 @@ sub nn_conv {
     return $softmax;
 }
 
-my $mlp = nn_conv($data);
+my $mlp = $ARGV[0] ? nn_conv($data) : nn_fc($data);
 
-# We visualize the network structure with output size (the batch_size is ignored.)
+#We visualize the network structure with output size (the batch_size is ignored.)
 #my $shape = { data => [ $batch_size, 1, 28, 28 ] };
 #show_network(mx->viz->plot_network($mlp, shape => $shape));
 
@@ -173,10 +178,6 @@ $model->fit(
     num_epoch => 10,      # number of data passes for training 
     eval_data => $val_iter, # validation data
     batch_end_callback => mx->callback->Speedometer($batch_size, 200), # output progress for each 200 data batches
-#    optimizer_params => {
-#        learning_rate => 0.01,
-#        rescale_grad => 1/$batch_size,
-#    },
     optimizer => 'adam',
 );
 

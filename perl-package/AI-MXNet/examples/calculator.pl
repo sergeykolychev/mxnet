@@ -34,18 +34,21 @@ sub nn_fc {
         num_hidden => 1,
     ));
     my $wide = mx->sym->Concat($data, $ln);
-    my $fc = mx->sym->FullyConnected(data => $wide, num_hidden => 1);
+    my $fc = mx->sym->FullyConnected(
+	$wide,
+	num_hidden => 1
+    );
     return mx->sym->MAERegressionOutput(data => $fc, name => 'softmax');
 }
 
 sub learn_function {
     my(%args) = @_;
     my $func = $args{func};
-    my $batch_size = 128;
+    my $batch_size = $args{batch_size}//128;
     my($train_iter, $eval_iter) = samples($batch_size, $func);
-    my $sym = nn_fc(mx->sym->Variable('data'), 'softmax');
+    my $sym = nn_fc();
 
-    if(0) {
+    if($ARGV[0]) {
         my @dsz = @{$train_iter->data->[0][1]->shape};
         my @lsz = @{$train_iter->label->[0][1]->shape};
         my $shape = {
@@ -64,10 +67,15 @@ sub learn_function {
         eval_data => $eval_iter,
         optimizer => 'adam',
         optimizer_params => {
-            learning_rate => 0.01,
+            learning_rate => $args{lr}//0.01,
+            rescale_grad => 1/$batch_size,
+            lr_scheduler  => AI::MXNet::FactorScheduler->new(
+        	step => 100,
+        	factor => 0.99
+            )
         },
         eval_metric => 'mse',
-        num_epoch => 4,
+        num_epoch => $args{epoch}//25,
     );
 
     # refit the model for calling on 1 sample at a time
@@ -82,6 +90,11 @@ sub learn_function {
     );
 
     # wrap a helper around making predictions
+    my ($arg_params) = $model->get_params;
+    for my $k (sort keys %$arg_params)
+    {
+	print "$k -> ". $arg_params->{$k}->aspdl."\n";
+    }
     return sub {
         my($n, $m) = @_;
         return $model->predict(mx->io->NDArrayIter(
@@ -98,41 +111,19 @@ my $add = learn_function(func => sub {
 my $sub = learn_function(func => sub {
     my($n, $m) = @_;
     return $n - $m;
-});
+}, batch_size => 50, epoch => 40);
 my $mul = learn_function(func => sub {
     my($n, $m) = @_;
     return $n * $m;
-});
+}, batch_size => 50, epoch => 40);
 my $div = learn_function(func => sub {
     my($n, $m) = @_;
     return $n / $m;
-});
+}, batch_size => 10, epoch => 80);
+
 
 print "12345 + 54321 ≈ ", $add->(12345, 54321), "\n";
 print "188 - 88 ≈ ", $sub->(188, 88), "\n";
-print "0.5 * 2 ≈ ", $mul->(0.5, 2), "\n";
-print "0.5 / 2 ≈ ", $div->(0.5, 2), "\n";
+print "250 * 2 ≈ ", $mul->(250, 2), "\n";
+print "250 / 2 ≈ ", $div->(250, 2), "\n";
 
-
-sub tbl {
-    my @l = ('     ');
-    
-    {
-        my @l = ('     ');
-        for(my $j = 0; $j < @_; $j++) {
-            push @l, sprintf "%5.2f", $_[$j];
-        }
-        print "@l\n";
-    }
-    for(my $i = 0; $i < @_; $i++) {
-        my @l = (sprintf "%5.2f", $_[$i]);
-        for(my $j = 0; $j < @_; $j++) {
-            push @l, sprintf "%5.2f", $mul->($_[$i], $_[$j]);
-        }
-        print "@l\n";
-    }
-}
-tbl(map { ($_ - 5) / 10 } 0 .. 20);
-
-#printf "1.0 * %.2f = %.2f\n", $_, $mul->(2, $_ / 10)
-#    for map { $_ / 10 } 0 .. 20
