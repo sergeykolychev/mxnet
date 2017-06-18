@@ -103,14 +103,12 @@ void SetNDInputsOutputs(const nnvm::Op* op,
 
 void SetContext(Context* p_ctx,
                 const nnvm::NodeAttrs& attrs,
-                const int& num_inputs,
                 const std::vector<NDArray>& ndinputs,
-                const int& infered_num_outputs,
                 const std::vector<NDArray>& ndoutputs) {
   Context& ctx = *p_ctx;
-  if (num_inputs) {
+  if (ndinputs.size()) {
     ctx = ndinputs[0].ctx();
-  } else if (infered_num_outputs && !ndoutputs[0].is_none()) {
+  } else if (ndoutputs.size() && !ndoutputs[0].is_none()) {
     ctx = ndoutputs[0].ctx();
   } else if (attrs.dict.find("ctx") != attrs.dict.end()) {
     ctx = Context::FromString(attrs.dict.at("ctx"));
@@ -127,7 +125,6 @@ void SetShapeType(const nnvm::Op* op,
                   const nnvm::NodeAttrs& attrs,
                   const Context& ctx,
                   const std::vector<NDArray>& ndinputs,
-                  const int& infered_num_outputs,
                   std::vector<NDArray>* p_ndoutputs) {
   std::vector<NDArray>& ndoutputs = *p_ndoutputs;
   static auto& infershape = nnvm::Op::GetAttr<nnvm::FInferShape>("FInferShape");
@@ -148,7 +145,7 @@ void SetShapeType(const nnvm::Op* op,
   CHECK(infershape.count(op))
     << "Operator " << op->name << " is missing FInferShape attribute";
   CHECK(infershape[op](attrs, &in_shapes, &out_shapes));
-  CHECK_EQ(out_shapes.size(), static_cast<size_t>(infered_num_outputs));
+  CHECK_EQ(out_shapes.size(), ndoutputs.size());
 
   // infer type
   std::vector<int>& in_types = ret->arg_types;
@@ -165,9 +162,9 @@ void SetShapeType(const nnvm::Op* op,
   CHECK(infertype.count(op))
     << "Operator " << op->name << " is missing FInferType attribute";
   CHECK(infertype[op](attrs, &in_types, &out_types));
-  CHECK_EQ(out_types.size(), static_cast<size_t>(infered_num_outputs));
+  CHECK_EQ(out_types.size(), ndoutputs.size());
 
-  for (int i = 0; i < infered_num_outputs; ++i) {
+  for (size_t i = 0; i < ndoutputs.size(); ++i) {
     if (ndoutputs[i].is_none()) {
       ndoutputs[i] = NDArray(out_shapes[i], ctx, true, out_types[i]);
     } else {
@@ -323,34 +320,26 @@ void PushOperator(std::shared_ptr<Operator> opr,
 }
 
 void ImperativeInvokeImpl(const nnvm::NodeAttrs& attrs,
-                          int num_inputs,
-                          NDArrayHandle *inputs,
-                          int *num_outputs,
-                          NDArrayHandle **outputs) {
+                          std::vector<NDArray>* p_ndinputs,
+                          std::vector<NDArray>* p_ndoutputs) {
   static auto& fcpu = nnvm::Op::GetAttr<FCompute>("FCompute<cpu>");
   static auto& fgpu = nnvm::Op::GetAttr<FCompute>("FCompute<gpu>");
   static auto& ndfunc = nnvm::Op::GetAttr<FNDArrayFunction>("FNDArrayFunction");
   static auto& createop = nnvm::Op::GetAttr<FCreateLayerOp>("FCreateLayerOp");
   MXAPIThreadLocalEntry *ret = MXAPIThreadLocalStore::Get();
-  NDArray** outarray = *reinterpret_cast<NDArray***>(outputs);
+
   const nnvm::Op *op = attrs.op;
+  std::vector<NDArray>& ndinputs  = *p_ndinputs;
+  std::vector<NDArray>& ndoutputs = *p_ndoutputs;
 
-  int infered_num_outputs;
-  int num_visible_outputs;
-  SetNumOutputs(op, attrs, num_inputs,
-      &infered_num_outputs, &num_visible_outputs);
-
-  std::vector<NDArray> ndinputs, ndoutputs;
-  SetNDInputsOutputs(op, &ndinputs, &ndoutputs, num_inputs, inputs,
-      num_outputs, infered_num_outputs, num_visible_outputs, outarray);
 
   if (ndfunc.count(op)) {
     ndfunc[op](attrs, ndinputs, &ndoutputs);
   } else {
     // TODO(piiswrong): infer ctx
     Context ctx;
-    SetContext(&ctx, attrs, num_inputs, ndinputs, infered_num_outputs, ndoutputs);
-    SetShapeType(op, attrs, ctx, ndinputs, infered_num_outputs, &ndoutputs);
+    SetContext(&ctx, attrs, ndinputs, ndoutputs);
+    SetShapeType(op, attrs, ctx, ndinputs, &ndoutputs);
 
     std::vector<engine::VarHandle> read_vars, write_vars;
     std::vector<Resource> requested;
@@ -388,6 +377,33 @@ void ImperativeInvokeImpl(const nnvm::NodeAttrs& attrs,
         << " FCompute<xpu>, NDArrayFunction, FCreateOperator be registered";
     }
   }
+}
+
+int MXImperativeInvoke(AtomicSymbolCreator creator,
+                       int num_inputs,
+                       NDArrayHandle *inputs,
+                       int *num_outputs,
+                       NDArrayHandle **outputs,
+                       int num_params,
+                       const char **param_keys,
+                       const char **param_vals) {
+  const nnvm::Op* op = static_cast<nnvm::Op*>(creator);
+  MXAPIThreadLocalEntry *ret = MXAPIThreadLocalStore::Get();
+  NDArray** outarray = *reinterpret_cast<NDArray***>(outputs);
+
+  API_BEGIN();
+  nnvm::NodeAttrs attrs;
+  SetOpAttrs(op, &attrs, num_inputs, num_params, param_keys, param_vals);
+
+  int infered_num_outputs;
+  int num_visible_outputs;
+  SetNumOutputs(op, attrs, num_inputs, &infered_num_outputs, &num_visible_outputs);
+
+  std::vector<NDArray> ndinputs, ndoutputs;
+  SetNDInputsOutputs(op, &ndinputs, &ndoutputs, num_inputs, inputs,
+      num_outputs, infered_num_outputs, num_visible_outputs, outarray);
+
+  ImperativeInvokeImpl(attrs, &ndinputs, &ndoutputs);
 
   if (outarray == nullptr) {
     ret->ret_handles.clear();
@@ -401,57 +417,86 @@ void ImperativeInvokeImpl(const nnvm::NodeAttrs& attrs,
       *outarray[i] = std::move(ndoutputs[i]);
     }
   }
-}
-
-int MXImperativeInvoke(AtomicSymbolCreator creator,
-                       int num_inputs,
-                       NDArrayHandle *inputs,
-                       int *num_outputs,
-                       NDArrayHandle **outputs,
-                       int num_params,
-                       const char **param_keys,
-                       const char **param_vals) {
-  const nnvm::Op* op = static_cast<nnvm::Op*>(creator);
-
-  API_BEGIN();
-  nnvm::NodeAttrs attrs;
-  SetOpAttrs(op, &attrs, num_inputs, num_params, param_keys, param_vals);
-  ImperativeInvokeImpl(attrs, num_inputs, inputs, num_outputs, outputs);
   API_END();
 }
 
-int MXCachedCreateOp(AtomicSymbolCreator creator,
-                     int num_inputs,
-                     int num_params,
-                     const char **param_keys,
-                     const char **param_vals,
+int MXCreateCachedOp(SymbolHandle handle,
                      CachedOpHandle *out) {
-  const nnvm::Op* op = static_cast<nnvm::Op*>(creator);
+  nnvm::Symbol* sym = static_cast<nnvm::Symbol*>(handle);
 
   API_BEGIN();
-  nnvm::NodeAttrs *attrs = new nnvm::NodeAttrs;
-  SetOpAttrs(op, attrs, num_inputs, num_params, param_keys, param_vals);
-  *out = attrs;
+  nnvm::Graph *g = new nnvm::Graph;
+  g->outputs = sym->outputs;
+  g->attrs["vars"] = std::make_shared<dmlc::any>(
+    sym->ListInputs(nnvm::Symbol::kAll));
+  *out = g;
   API_END();
 }
 
-int MXCachedFree(CachedOpHandle handle) {
-  nnvm::NodeAttrs *attrs = static_cast<nnvm::NodeAttrs*>(handle);
-
+int MXFreeCachedOp(CachedOpHandle handle) {
+  nnvm::Graph *g = static_cast<nnvm::Graph*>(handle);
   API_BEGIN();
-  delete attrs;
+  delete g;
   API_END();
 }
 
-int MXCachedInvoke(CachedOpHandle handle,
-                   int num_inputs,
-                   NDArrayHandle *inputs,
-                   int *num_outputs,
-                   NDArrayHandle **outputs) {
-  nnvm::NodeAttrs *attrs = static_cast<nnvm::NodeAttrs*>(handle);
+int MXInvokeCachedOp(CachedOpHandle handle,
+                     int num_inputs,
+                     NDArrayHandle *inputs,
+                     int *num_outputs,
+                     NDArrayHandle **outputs) {
+  nnvm::Graph *g = static_cast<nnvm::Graph*>(handle);
+  MXAPIThreadLocalEntry *ret = MXAPIThreadLocalStore::Get();
+  NDArray** outarray = *reinterpret_cast<NDArray***>(outputs);
 
   API_BEGIN();
-  ImperativeInvokeImpl(*attrs, num_inputs, inputs, num_outputs, outputs);
+  const std::vector<nnvm::NodePtr>& vars =
+    g->GetAttr<std::vector<nnvm::NodePtr> >("vars");
+  const nnvm::IndexedGraph& idx = g->indexed_graph();
+  CHECK_EQ(static_cast<size_t>(num_inputs), vars.size())
+      << "Actually number of inputs differs from expected number of inputs";
+
+  std::vector<NDArray> buff(idx.num_node_entries());
+  for (size_t i = 0; i < vars.size(); ++i) {
+    buff[idx.entry_id(idx.node_id(vars[i].get()), 0)] =
+        *static_cast<NDArray*>(inputs[i]);
+  }
+
+  for (size_t i = 0; i < idx.num_nodes(); ++i) {
+    const nnvm::IndexedGraph::Node& node = idx[i];
+    if (node.source->attrs.op == nullptr) continue;
+    std::vector<NDArray> in;
+    in.reserve(node.inputs.size());
+    for (const auto& j : node.inputs) {
+      in.emplace_back(buff[idx.entry_id(j)]);
+    }
+    std::vector<NDArray> out(node.source->num_outputs());
+    Context ctx;
+    SetContext(&ctx, node.source->attrs, in, out);
+    SetShapeType(node.source->attrs.op, node.source->attrs, ctx, in, &out);
+    ImperativeInvokeImpl(node.source->attrs, &in, &out);
+
+    for (size_t j = 0; j < node.source->num_outputs(); ++j) {
+      buff[idx.entry_id(i, j)] = std::move(out[j]);
+    }
+  }
+
+  if (outarray == nullptr) {
+    ret->ret_handles.clear();
+    for (const auto& i : idx.outputs()) {
+      ret->ret_handles.push_back(
+        reinterpret_cast<NDArrayHandle>(
+          new NDArray(std::move(buff[idx.entry_id(i)]))));
+    }
+    *num_outputs = idx.outputs().size();
+    *outputs = dmlc::BeginPtr(ret->ret_handles);
+  } else {
+    CHECK_EQ(static_cast<size_t>(*num_outputs), idx.outputs().size())
+        << "Specifed number of output differs from expected number of outputs";
+    for (size_t i = 0; i < idx.outputs().size(); ++i) {
+      *outarray[i] = std::move(buff[idx.entry_id(idx.outputs()[i])]);
+    }
+  }
   API_END();
 }
 
