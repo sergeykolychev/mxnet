@@ -2,7 +2,7 @@ use strict;
 use warnings;
 use AI::MXNet qw(mx);
 use AI::MXNet::TestUtils qw(almost_equal);
-use Test::More tests => 9;
+use Test::More tests => 8;
 
 sub test_ndarray_reshape
 {
