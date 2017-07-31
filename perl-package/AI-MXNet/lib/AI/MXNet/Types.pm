@@ -38,6 +38,6 @@ subtype "NameShape"       => as "ArrayRef" => where {
 subtype "Callback"        => as "CodeRef|ArrayRef[Coderef]|AI::MXNet::Callback|ArrayRef[AI::MXNet::Callback]";
 subtype "EvalMetric"      => as "AI::MXNet::EvalMetric|Str|CodeRef";
 subtype "Optimizer"       => as "AI::MXNet::Optimizer|Str";
-subtype "Activation"      => as "AI::MXNet::Symbol|Str";
+subtype "Activation"      => as "AI::MXNet::Symbol|Str|CodeRef";
 subtype "SymbolOrArrayOfSymbols" => as "AI::MXNet::Symbol|ArrayRef[AI::MXNet::Symbol]";
 subtype "NameShapeOrDataDesc" => as "NameShape|AI::MXNet::DataDesc";
