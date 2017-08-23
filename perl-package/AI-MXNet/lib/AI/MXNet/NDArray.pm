@@ -106,6 +106,8 @@ method at(Index @indices)
     return $self->slice(@indices);
 }
 
+method len() { $self->shape->[0] }
+
 method slice(Slice @slices)
 {
     confess("No slices supplied") unless @slices;
@@ -156,7 +158,7 @@ method set(AcceptableInput $value, $reverse=)
     ## plain number
     if(not ref $value)
     {
-        $self->_set_value($value, { out => $self });
+        $self->_set_value($value, out => $self);
     }
     # ndarray
     elsif(blessed($value) and $value->isa(__PACKAGE__))
@@ -1403,14 +1405,31 @@ method detach()
     return __PACKAGE__->new(handle => $handle);
 }
 
-method backward(Maybe[AI::MXNet::NDArray] $out_grad=, Bool $retain_graph=0)
+=head2 backward
+
+    Compute the gradients of this NDArray w.r.t variables.
+
+    Parameters
+    ----------
+    $out_grad= : NDArray, optional
+        Gradient with respect to head.
+    $retain_graph=0 : bool, optional
+        Whether to retain the computaion graph for another backward
+        pass on the same graph. By default the computaion history
+        is cleared.
+    $is_train=1 : bool, optional
+        Whether to compute gradient for training or inference.
+=cut
+
+method backward(Maybe[AI::MXNet::NDArray] $out_grad=, Bool $retain_graph=0, Bool $is_train=1)
 {
     check_call(
-        AI::MXNetCAPI::AutogradBackward(
+        AI::MXNetCAPI::AutogradBackwardEx(
             1,
             [$self->handle],
             [defined $out_grad ? $out_grad->handle : undef],
-            $retain_graph
+            $retain_graph,
+            $is_train
         )
     )
 }
@@ -1426,5 +1445,7 @@ eval << "EOV" if ($^V and $^V >= 5.006007);
   $lvalue_methods
 }
 EOV
+
+sub contrib { 'AI::MXNet::Contrib::NDArray' }
 
 __PACKAGE__->meta->make_immutable;

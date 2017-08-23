@@ -279,6 +279,19 @@ sub _notify_shutdown
     check_call(AI::MXNetCAPI::NotifyShutdown());
 }
 
+sub _indent
+{
+    my ($s_, $numSpaces) = @_;
+    my @s = split(/\n/, $s_);
+    if (@s == 1)
+    {
+        return $s_;
+    }
+    my $first = shift(@s);
+    @s = ($first, map { (' 'x$numSpaces) . $_ } @s);
+    return join("\n", @s);
+}
+
 END {
     _notify_shutdown();
     Time::HiRes::sleep(0.01);
@@ -288,5 +301,18 @@ END {
 *pceil  = \&ceil;
 ## making sure that we can stringify arbitrarily large piddles
 $PDL::toolongtoprint = 1000_000_000;
+## convenience subs
+{
+    my $orig_at = PDL->can('at');
+    no warnings 'redefine';
+    *PDL::at = sub {
+        my ($self, @args) = @_;
+        return $orig_at->($self, @args) if @args != 1;
+        return $orig_at->($self, @args) if $self->ndims == 1;
+        return $self->slice(('X')x($self->ndims-1), $args[0])->squeeze;
+    };
+    *PDL::len    = sub { shift->dim(-1) };
+    *PDL::dtype  = sub { DTYPE_MX_TO_STR->{ DTYPE_PDL_TO_MX->{ shift->type->numval } } };
+}
 
 1;

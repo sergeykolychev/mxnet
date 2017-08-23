@@ -108,6 +108,7 @@ has 'clip_gradient'       => (is => "rw", isa => "Maybe[Num]");
 has 'param_idx2name'      => (is => "rw", isa => "HashRef[Str]", default => sub { +{} });
 has 'idx2name'            => (is => "rw", isa => "HashRef[Str]");
 has 'sym'                 => (is => "rw", isa => "Maybe[AI::MXNet::Symbol]");
+has 'param_dict'          => (is => "rw", isa => "HashRef", default => sub { +{} });
 
 sub BUILD
 {
@@ -224,7 +225,11 @@ method _get_lr(Index $index)
         $lr = $self->lr;
     }
 
-    if(exists $self->lr_mult->{ $index })
+    if(exists $self->param_dict->{ $index })
+    {
+        $lr *= $self->param_dict->{ $index }->lr_mult;
+    }
+    elsif(exists $self->lr_mult->{ $index })
     {
         $lr *= $self->lr_mult->{ $index };
     }
@@ -238,7 +243,11 @@ method _get_lr(Index $index)
 method _get_wd(Index $index)
 {
     my $wd = $self->wd;
-    if(exists $self->wd_mult->{ $index })
+    if(exists $self->param_dict->{ $index })
+    {
+        $wd *= $self->param_dict->{ $index }->wd_mult;
+    }
+    elsif(exists $self->wd_mult->{ $index })
     {
         $wd *= $self->wd_mult->{ $index };
     }
@@ -297,7 +306,7 @@ has 'multi_precision' => (is => "ro", isa => "Bool", default => 0);
 sub BUILD
 {
     my $self = shift;
-    $self->kwargs({ rescale_grad => $self->rescale_grad });
+    $self->kwargs({});
     if($self->momentum)
     {
         $self->kwargs->{momentum} = $self->momentum;
@@ -351,6 +360,7 @@ method update(
         out => $weight,
         lr  => $lr,
         wd  => $wd,
+        rescale_grad => $self->rescale_grad,
         %{ $self->kwargs }
     };
     my $use_multi_precision = ref($state) eq 'ARRAY';
@@ -668,7 +678,6 @@ sub BUILD
 {
     my $self = shift;
     $self->kwargs({
-        rescale_grad => $self->rescale_grad,
         beta1   => $self->beta1,
         beta2   => $self->beta2,
         epsilon => $self->epsilon
@@ -715,6 +724,7 @@ method update(
             out => $weight,
             lr  => $lr,
             wd  => $wd,
+            rescale_grad => $self->rescale_grad,
             %{ $self->kwargs }
         }
     );
@@ -867,7 +877,6 @@ sub BUILD
 {
     my $self = shift;
     $self->kwargs({
-        rescale_grad => $self->rescale_grad,
         gamma1       => $self->gamma1,
         epsilon      => $self->epsilon
     });
@@ -933,6 +942,7 @@ method update(
                 out => $weight,
                 lr  => $lr,
                 wd  => $wd,
+                rescale_grad => $self->rescale_grad,
                 %{ $self->kwargs }
             }
         );
@@ -945,6 +955,7 @@ method update(
                 out => $weight,
                 lr  => $lr,
                 wd  => $wd,
+                rescale_grad => $self->rescale_grad,
                 %{ $self->kwargs }
             }
         );

@@ -483,7 +483,7 @@ use Mouse;
 use AI::MXNet::Base;
 extends 'AI::MXNet::EvalMetric';
 has '+name'   => (default => 'cross-entropy');
-has 'eps'     => (is => 'ro', isa => 'Num', default => 1e-8);
+has 'eps'     => (is => 'ro', isa => 'Num', default => 1e-12);
 around BUILDARGS => sub {
     my $orig  = shift;
     my $class = shift;

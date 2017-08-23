@@ -1463,4 +1463,6 @@ sub  _ufunc_helper
     }
 }
 
+sub contrib { 'AI::MXNet::Contrib::Symbol' }
+
 1;

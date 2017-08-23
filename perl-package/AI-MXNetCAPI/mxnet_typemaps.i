@@ -82,13 +82,13 @@
     }
 }
 
-%typemap(in,numinputs=0) (int *out) (int temp)
+%typemap(in,numinputs=0) (int *out) (int temp), (bool *out) (bool temp)
 {
     temp = 0;
     $1 = &temp;
 }
 
-%typemap(argout) (int *out)
+%typemap(argout) (int *out), (bool *out)
 {
     if(!result)
     {
