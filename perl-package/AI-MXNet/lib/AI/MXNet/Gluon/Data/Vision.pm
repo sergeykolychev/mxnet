@@ -27,6 +27,7 @@ has 'train'          => (is => 'ro', isa => 'Bool', required => 1);
 has 'transform'      => (is => 'ro', isa => 'Maybe[CodeRef]');
 has [qw(data label)] => (is => 'rw', init_arg => undef);
 extends 'AI::MXNet::Gluon::Data::Set';
+method python_constructor_arguments() { ['root', 'train', 'transform'] }
 
 sub BUILD
 {
@@ -83,19 +84,6 @@ extends 'AI::MXNet::Gluon::Data::Vision::DownloadedDataSet';
     transform => sub { my ($data, $label) = @_; return ($data->astype('float32')/255, $label) }
 =cut
 
-around BUILDARGS => sub {
-    my $orig  = shift;
-    my $class = shift;
-    if(@_ % 2)
-    {
-        my $root = shift;
-        return $class->$orig(root => $root, @_);
-    }
-    else
-    {
-        return $class->$orig(@_);
-    }
-};
 has [qw/_base_url _train_data _train_label _test_data _test_label/] => (is => 'rw');
 has '+root'  => (default => '~/.mxnet/datasets/mnist');
 has '+train' => (default => 1);

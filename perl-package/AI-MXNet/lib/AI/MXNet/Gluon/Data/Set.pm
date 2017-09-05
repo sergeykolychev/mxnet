@@ -20,6 +20,7 @@ use warnings;
 package AI::MXNet::Gluon::Data::Set;
 use AI::MXNet::Function::Parameters;
 use Mouse;
+around BUILDARGS => \&AI::MXNet::Base::process_arguments;
 
 =head1 NAME
 
@@ -64,12 +65,7 @@ extends 'AI::MXNet::Gluon::Data::Set';
         The label array.
 =cut
 has [qw/data label/] => (is => 'rw', isa => 'PDL|AI::MXNet::NDArray', required => 1);
-around BUILDARGS => sub {
-    my $orig  = shift;
-    my $class = shift;
-    return $class->$orig(data => $_[0], label => $_[1]) if @_ == 2;
-    return $class->$orig(@_);
-};
+method python_constructor_arguments() { ['data', 'label'] }
 
 sub BUILD
 {
@@ -121,13 +117,7 @@ extends 'AI::MXNet::Gluon::Data::Set';
 =cut
 has 'filename' => (is => 'ro', isa =>'Str', required => 1);
 has '_record'  => (is => 'rw', init_arg => undef);
-
-around BUILDARGS => sub {
-    my $orig  = shift;
-    my $class = shift;
-    return $class->$orig(filename => $_[0]) if @_ == 1;
-    return $class->$orig(@_);
-};
+method python_constructor_arguments() { ['filename'] }
 
 sub BUILD
 {

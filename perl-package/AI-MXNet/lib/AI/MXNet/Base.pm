@@ -292,6 +292,34 @@ sub _indent
     return join("\n", @s);
 }
 
+my %internal_arguments = (prefix => 1, params => 1);
+my %attributes_per_class;
+sub process_arguments
+{
+    my $orig  = shift;
+    my $class = shift;
+    if($class->can('python_constructor_arguments'))
+    {
+        if(not exists $attributes_per_class{$class})
+        {
+            %{ $attributes_per_class{$class} } = map { $_->name => 1 } $class->meta->get_all_attributes;
+        }
+        my %kwargs;
+        while(@_ >= 2 and not ref $_[-2] and (exists $attributes_per_class{$class}{ $_[-2] } or exists $internal_arguments{ $_[-2] }))
+        {
+            my $v = pop(@_);
+            my $k = pop(@_);
+            $kwargs{ $k } = $v;
+        }
+        if(@_)
+        {
+            @kwargs{ @{ $class->python_constructor_arguments }[0..@_-1] } = @_;
+        }
+        return $class->$orig(%kwargs);
+    }
+    return $class->$orig(@_);
+}
+
 END {
     _notify_shutdown();
     Time::HiRes::sleep(0.01);

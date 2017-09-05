@@ -84,19 +84,8 @@ has 'sampler'       => (is => 'rw', isa => 'AI::MXNet::Gluon::Data::Sampler');
 has 'batch_sampler' => (is => 'rw', isa => 'AI::MXNet::Gluon::Data::Sampler');
 has 'last_batch'    => (is => 'rw', isa => 'Str', default => 'keep');
 
-around BUILDARGS => sub {
-    my $orig  = shift;
-    my $class = shift;
-    if(@_ % 2)
-    {
-        my $dataset = shift;
-        return $class->$orig(dataset => $dataset, @_);
-    }
-    else
-    {
-        return $class->$orig(@_);
-    }
-};
+around BUILDARGS => \&AI::MXNet::Base::process_arguments;
+method python_constructor_arguments() { ['dataset'] }
 
 sub BUILD
 {

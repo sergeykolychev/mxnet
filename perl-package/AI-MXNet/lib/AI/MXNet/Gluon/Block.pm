@@ -193,29 +193,7 @@ method _regroup(
 has _prefix => (is => 'rw', init_arg => 'prefix', isa => 'Str');
 has _params => (is => 'rw', init_arg => 'params', isa => 'Maybe[AI::MXNet::Gluon::ParameterDict]');
 has [qw/_name _scope _children/] => (is => 'rw', init_arg => undef);
-
-my %internal_arguments = qw/prefix 1 params 1/;
-around BUILDARGS => sub {
-    my $orig  = shift;
-    my $class = shift;
-    if($class->can('python_constructor_arguments'))
-    {
-        my $meta = $class->meta;
-        my %kwargs;
-        while(@_ >= 2 and not ref $_[-2] and ($meta->has_attribute($_[-2]) or exists $internal_arguments{ $_[-2] }))
-        {
-            my $v = pop(@_);
-            my $k = pop(@_);
-            $kwargs{ $k } = $v;
-        }
-        if(@_)
-        {
-            @kwargs{ @{ $class->python_constructor_arguments }[0..@_-1] } = @_;
-        }
-        return $class->$orig(%kwargs);
-    }
-    return $class->$orig(@_);
-};
+around BUILDARGS => \&AI::MXNet::Base::process_arguments;
 
 sub BUILD
 {
