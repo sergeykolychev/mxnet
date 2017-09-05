@@ -488,7 +488,7 @@ sub BUILD
     );
     $self->running_var(
         $self->params->get(
-            'beta', grad_req=> $self->center ? 'write' : 'null',
+            'running_var', grad_req => $self->center ? 'write' : 'null',
             shape => [$self->in_channels], init => $self->running_variance_initializer,
             allow_deferred_init => 1, differentiable => 0
         )
@@ -547,6 +547,10 @@ extends 'AI::MXNet::Gluon::HybridBlock';
         Same shape as input.
 =cut
 has 'alpha' => (is => 'ro', isa => 'Num', required => 1);
+method python_constructor_arguments()
+{
+    ['alpha'];
+}
 
 method hybrid_forward(GluonClass $F, GluonInput $x)
 {

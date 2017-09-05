@@ -91,11 +91,7 @@ sub train
     # Collect all parameters from net and its children, then initialize them.
     $net->initialize(mx->init->Xavier(magnitude=>2.24), ctx=>$ctx);
     # Trainer is for updating parameters with gradient.
-    my $trainer = gluon->Trainer(
-        params => $net->collect_params(),
-        optimizer => 'sgd',
-        optimizer_params => { learning_rate => $lr, momentum => $momentum }
-    );
+    my $trainer = gluon->Trainer($net->collect_params(), 'sgd', { learning_rate => $lr, momentum => $momentum });
     my $metric = mx->metric->Accuracy();
     my $loss = gluon->loss->SoftmaxCrossEntropyLoss();
 

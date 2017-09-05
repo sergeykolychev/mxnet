@@ -101,6 +101,7 @@ has 'bias_initializer'   => (is => 'rw', isa => 'Maybe[Initializer]', default =>
 has 'adj'                => (is => 'rw');
 has [qw/weight bias
         kwargs act/]     => (is => 'rw', init_arg => undef);
+method python_constructor_arguments() { [qw/channels kernel_size strides padding dilation/] }
 
 sub BUILD
 {
@@ -126,13 +127,13 @@ sub BUILD
         });
         if(defined $self->adj)
         {
-            $self->_kwargs->{adj} = $self->adj;
+            $self->kwargs->{adj} = $self->adj;
         }
 
         my @dshape = (0)x(@{ $self->kernel_size } + 2);
         $dshape[index($self->layout, 'N')] = 1;
-        $dshape[index($self->layout, 'C')] = $self->_in_channels;
-        my $wshapes = _infer_weight_shape($self->op_name, \@dshape, $self->_kwargs);
+        $dshape[index($self->layout, 'C')] = $self->in_channels;
+        my $wshapes = _infer_weight_shape($self->op_name, \@dshape, $self->kwargs);
         $self->weight(
             $self->params->get(
                 'weight', shape => $wshapes->[1],
@@ -605,13 +606,13 @@ method _update_kernel_size()
 
 __PACKAGE__->register('AI::MXNet::Gluon::NN');
 
-package AI::MXNet::Gluon::NN::Conv2Transpose;
+package AI::MXNet::Gluon::NN::Conv2DTranspose;
 use AI::MXNet::Gluon::Mouse;
 extends 'AI::MXNet::Gluon::NN::Conv';
 
 =head1 NAME
 
-    AI::MXNet::Gluon::NN::Conv2Transpose
+    AI::MXNet::Gluon::NN::Conv2DTranspose
 =cut
 
 =head1 DESCRIPTION
@@ -712,13 +713,13 @@ method _update_kernel_size()
 
 __PACKAGE__->register('AI::MXNet::Gluon::NN');
 
-package AI::MXNet::Gluon::NN::Conv3Transpose;
+package AI::MXNet::Gluon::NN::Conv3DTranspose;
 use AI::MXNet::Gluon::Mouse;
 extends 'AI::MXNet::Gluon::NN::Conv';
 
 =head1 NAME
 
-    AI::MXNet::Gluon::NN::Conv3Transpose
+    AI::MXNet::Gluon::NN::Conv3DTranspose
 =cut
 
 =head1 DESCRIPTION

@@ -1447,5 +1447,6 @@ eval << "EOV" if ($^V and $^V >= 5.006007);
 EOV
 
 sub contrib { 'AI::MXNet::Contrib::NDArray' }
+sub random  { 'AI::MXNet::Random' }
 
 __PACKAGE__->meta->make_immutable;

@@ -59,6 +59,8 @@ has [qw/_scale _contexts
     _update_on_kvstore
     _updaters
     _optimizer/]       => (is => 'rw', init_arg => undef);
+around BUILDARGS => \&AI::MXNet::Base::process_arguments;
+method python_constructor_arguments() { ['params', 'optimizer', 'optimizer_params'] }
 
 sub BUILD
 {

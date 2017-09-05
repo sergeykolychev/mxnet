@@ -112,14 +112,14 @@ has 'dtype'               => (is => 'rw', isa => 'Dtype', default => 'float32');
 has [qw/lr_mult wd_mult/] => (is => 'rw', isa => 'Num', default => 1);
 has 'init'                => (is => 'rw', isa => 'Maybe[Initializer]');
 has 'allow_deferred_init' => (is => 'rw', isa => 'Bool', default => 0);
-has '_differentiable'     => (is => 'rw', init_arg => 'differentiable', isa => 'Bool', default => 1);
+has 'differentiable'      => (is => 'rw', isa => 'Bool', default => 1);
 has [qw/_var _data _grad
     _deferred_init _ctx_list/]      => (is => 'rw', init_arg => undef);
 
 method grad_req(Maybe[GradReq] $req=)
 {
     return $self->_grad_req unless defined $req;
-    if(not $self->_differentiable)
+    if(not $self->differentiable)
     {
         $req = 'null';
     }
@@ -668,6 +668,7 @@ method _get_impl($name)
             The created or retrieved `Parameter`.
 =cut
 
+use Data::Dumper;
 method get(Str $name, %kwargs)
 {
     $name = $self->prefix . $name;
@@ -684,15 +685,15 @@ method get(Str $name, %kwargs)
             if($param->can($k) and defined $param->$k)
             {
                 assert(
-                    (not defined $v or $v eq $param->$k),
+                    (not defined $v or Dumper($v) eq Dumper($param->$k)),
                     "Cannot retrieve Parameter $name because desired attribute ".
                     "does not match with stored for attribute $k: ".
-                    "desired $v vs stored ${\ $param->$k }."
+                    "desired ".Dumper($v)." vs stored ". Dumper($param->$k)
                 );
             }
             else
             {
-                __PACKAGE__->setattr($param, $k, $v);
+                confess("unknown param $k, $v");
             }
         }
     }

@@ -649,6 +649,11 @@ Int            :$inter_method=2
     return \@auglist;
 }
 
+method imresize(AI::MXNet::NDArray $src, Int $w, Int $h, Int $interp=2)
+{
+    return AI::MXNet::NDArray->_cvimresize($src, $w, $h, { interp=>$interp });
+}
+
 method ImageIter(@args) { AI::MXNet::ImageIter->new(@args) }
 
 package AI::MXNet::ImageIter;

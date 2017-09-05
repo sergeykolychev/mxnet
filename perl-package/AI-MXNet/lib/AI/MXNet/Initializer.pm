@@ -443,6 +443,12 @@ method _init_weight(Str $name, AI::MXNet::NDArray $arr)
 
 __PACKAGE__->register;
 
+package AI::MXNet::Ones;
+use Mouse;
+extends 'AI::MXNet::One';
+
+__PACKAGE__->register;
+
 package AI::MXNet::Constant;
 use Mouse;
 extends 'AI::MXNet::Initializer';

@@ -80,6 +80,7 @@ sub import
             sub rnn { 'AI::MXNet::RNN' }
             sub callback { 'AI::MXNet::Callback' }
             sub img { 'AI::MXNet::Image' }
+            sub image { 'AI::MXNet::Image' }
             sub contrib { 'AI::MXNet::Contrib' }
             sub name { '$short_name' }
             sub AttrScope { shift; AI::MXNet::Symbol::AttrScope->new(\@_) }
