@@ -27,7 +27,7 @@ use AI::MXNet::Function::Parameters;
 
 =head1 NAME
 
-    AI::MXNet::KVStoreServer - A server node for the key value store.
+    AI::MXNet::KVStoreServer - The key-value store server
 =cut
 
 =head2 new
@@ -61,7 +61,8 @@ method _controller()
         }
         else
         {
-            printf "server %d, unknown command (%d, %s)\n", $self->kvstore->rank, $cmd_id, $cmd_body;
+            my $rank = $self->kvstore->rank;
+            print("server $rank, unknown command ($cmd_id, $cmd_body)\n");
         }
     }
 }
@@ -95,4 +96,3 @@ func _init_kvstore_server_module()
 _init_kvstore_server_module();
 
 1;
-# src: python/mxnet/kvstore_server.py@{251ae71} Tue Aug 8 16:36:23 2017 -0700
