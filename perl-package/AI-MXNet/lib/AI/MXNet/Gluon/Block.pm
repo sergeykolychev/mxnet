@@ -195,6 +195,14 @@ has _params => (is => 'rw', init_arg => 'params', isa => 'Maybe[AI::MXNet::Gluon
 has [qw/_name _scope _children/] => (is => 'rw', init_arg => undef);
 around BUILDARGS => \&AI::MXNet::Base::process_arguments;
 
+sub AUTOLOAD {
+    my $name = $AI::MXNet::Gluon::Block::AUTOLOAD;
+    $name =~ s/.*:://;
+    my $self = shift;
+    AI::MXNet::Gluon::Mouse::has($name => (is => 'rw', 'init_arg' => undef, 'caller' => ref $self));
+    $self->$name(@_);
+}
+
 sub BUILD
 {
     my $self = shift;

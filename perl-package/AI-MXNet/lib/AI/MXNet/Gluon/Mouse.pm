@@ -23,9 +23,12 @@ Mouse::Exporter->setup_import_methods(
 );
 
 sub init_meta { return Mouse::init_meta(@_) }
-sub has {
-    my $meta = caller->meta;
+sub has
+{
     my $name = shift;
+    my %args = @_;
+    my $caller = delete $args{caller} // caller;
+    my $meta = $caller->meta;
 
     $meta->throw_error(q{Usage: has 'name' => ( key => value, ... )})
         if @_ % 2; # odd number of arguments
@@ -34,7 +37,7 @@ sub has {
         $meta->add_attribute(
             $n,
             trigger => sub { my $self = shift; $self->__setattr__($n, @_); },
-            @_
+            %args
         );
     }
     return;

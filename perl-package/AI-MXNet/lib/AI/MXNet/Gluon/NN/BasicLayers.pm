@@ -225,13 +225,13 @@ method python_constructor_arguments()
         The output would have shape `(x1, x2, ..., xn, units)`.
 =cut
 
-has 'units'              => (is => 'rw', isa => 'Int', required => 1);
-has 'activation'         => (is => 'rw', isa => 'Str');
-has 'use_bias'           => (is => 'rw', isa => 'Bool', default => 1);
-has 'flatten'            => (is => 'rw', isa => 'Bool', default => 1);
-has 'weight_initializer' => (is => 'rw', isa => 'Initializer');
-has 'bias_initializer'   => (is => 'rw', isa => 'Initializer', default => 'zeros');
-has 'in_units'           => (is => 'rw', isa => 'Int', default => 0);
+has 'units'               => (is => 'rw', isa => 'Int', required => 1);
+has 'activation'          => (is => 'rw', isa => 'Str');
+has 'use_bias'            => (is => 'rw', isa => 'Bool', default => 1);
+has 'flatten'             => (is => 'rw', isa => 'Bool', default => 1);
+has 'weight_initializer'  => (is => 'rw', isa => 'Initializer');
+has 'bias_initializer'    => (is => 'rw', isa => 'Initializer', default => 'zeros');
+has 'in_units'            => (is => 'rw', isa => 'Int', default => 0);
 has [qw/weight bias act/] => (is => 'rw', init_arg => undef);
 
 sub BUILD
