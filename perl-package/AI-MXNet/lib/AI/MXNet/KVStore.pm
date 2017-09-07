@@ -75,9 +75,9 @@ has 'handle' => (is => 'ro', isa => 'KVStoreHandle', required => 1);
 has '_updater' => (is => 'rw',  isa => 'AI::MXNet::Updater');
 has '_updater_func' => (is => 'rw', isa => 'CodeRef');
 
-method DEMOLISH
+sub DEMOLISH
 {
-    check_call(AI::MXNetCAPI::KVStoreFree($self->handle));
+    check_call(AI::MXNetCAPI::KVStoreFree(shift->handle));
 }
 
 =head2  init
@@ -110,7 +110,7 @@ method DEMOLISH
 
     >>> # init a list of key-value pairs
     >>> $keys = [5, 7, 9]
-    >>> $kv->init($keys, [map { mx->nd->ones($shape) } 1..@$keys])
+    >>> $kv->init(keys, [map { mx->nd->ones($shape) } 0..@$keys-1])
 =cut
 
 method init(
@@ -144,7 +144,7 @@ method init(
     Examples
     --------
     >>> # push a single key-value pair
-    >>> $kv->push(3, [ map { mx->nd->ones($shape) } 1..8 ])
+    >>> $kv->push(3, mx->nd->ones($shape)*8)
     >>> $kv->pull(3, out=>$a) # pull out the value
     >>> print $a->aspdl()
         [[ 8.  8.  8.]
@@ -161,15 +161,15 @@ method init(
 
     >>> # push a list of keys.
     >>> # single device
-    >>> $kv->push($keys, [map { mx->nd->ones($shape) } @$keys])
-    >>> $b = [map { mx->nd->zeros($shape) } @$keys]
+    >>> $kv->push($keys, [map { mx->nd->ones($shape) } 0..@$keys-1)
+    >>> $b = [map { mx->nd->zeros(shape) } 0..@$keys-1]
     >>> $kv->pull($keys, out=>$b)
     >>> print $b->[1]->aspdl
         [[ 1.  1.  1.]
         [ 1.  1.  1.]]
 
     >>> # multiple devices:
-    >>> $b = [map { [map { mx->nd->ones($shape, ctx => $_) } @$gpus] } @$keys]
+    >>> $b = [map { [map { mx->nd->ones($shape, ctx => $_) } @$gpus] } @$keys-1]
     >>> $kv->push($keys, $b)
     >>> $kv->pull($keys, out=>$b)
     >>> print $b->[1][1]->aspdl()
@@ -233,13 +233,13 @@ method push(
     >>> # pull a list of key-value pairs.
     >>> # On single device
     >>> $keys = [5, 7, 9]
-    >>> $b = [map { mx->nd->zeros($shape) } @$keys]
+    >>> $b = [map { mx->nd->zeros($shape) } 0..@$keys-1]
     >>> $kv->pull($keys, out=>$b)
     >>> print $b->[1]->aspdl()
         [[ 2.  2.  2.]
         [ 2.  2.  2.]]
     >>> # On multiple devices
-    >>> $b = [map { [ map { mx->nd->ones($shape, ctx => $_) } @$gpus] } @$keys]
+    >>> $b = [map { [map { mx->nd->ones($shape, ctx => $_) } @$gpus ] } 0..@$keys-1]
     >>> $kv->pull($keys, out=>$b)
     >>> print $b->[1][1]->aspdl()
         [[ 2.  2.  2.]
@@ -374,7 +374,7 @@ method save_optimizer_states(Str $fname)
 method load_optimizer_states(Str $fname)
 {
     assert(defined($self->_updater), "Cannot save states for distributed training");
-    $self->_updater->set_states(join '', IO::File->new($fname, 'rb').getlines());
+    $self->_updater->set_states(join '', IO::File->new($fname, 'rb')->getlines());
 }
 
 =head2 _set_updater
