@@ -462,7 +462,7 @@ method update(
     Index                     $index,
     AI::MXNet::NDArray        $weight,
     AI::MXNet::NDArray        $grad,
-    Maybe[AI::MXNet::NDArray] $state
+    Maybe[AI::MXNet::NDArray|ArrayRef[Maybe[AI::MXNet::NDArray]]] $state
 )
 {
     my $lr = $self->_get_lr($index);

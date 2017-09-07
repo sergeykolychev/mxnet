@@ -244,7 +244,7 @@ method pull(
 method set_optimizer(AI::MXNet::Optimizer $optimizer)
 {
     my $is_worker = check_call(AI::MXNetCAPI::KVStoreIsWorkerNode());
-    if($self->type eq 'dist' and $is_worker)
+    if($self->type =~ /dist/ and $is_worker)
     {
         my $optim_str = MIME::Base64::encode_base64(Storable::freeze($optimizer), "");
         $self->_send_command_to_servers(0, $optim_str);

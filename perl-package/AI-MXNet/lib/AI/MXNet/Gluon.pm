@@ -5,6 +5,8 @@ use AI::MXNet::Gluon::Loss;
 use AI::MXNet::Gluon::Trainer;
 use AI::MXNet::Gluon::Utils;
 use AI::MXNet::Gluon::Data;
+use AI::MXNet::Gluon::NN;
+use AI::MXNet::Gluon::RNN;
 
 sub import
 {
@@ -17,6 +19,8 @@ sub import
             my $short_name_package =<<"EOP";
             package $short_name;
             sub data { 'AI::MXNet::Gluon::Data' }
+            sub nn { 'AI::MXNet::Gluon::NN' }
+            sub rnn { 'AI::MXNet::Gluon::RNN' }
             sub loss { 'AI::MXNet::Gluon::Loss' }
             sub utils { 'AI::MXNet::Gluon::Utils' }
             sub Trainer { shift; AI::MXNet::Gluon::Trainer->new(\@_); }

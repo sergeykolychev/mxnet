@@ -961,7 +961,8 @@ method zeros(
     Shape $shape,
     AI::MXNet::Context :$ctx=AI::MXNet::Context->current_ctx,
     Dtype :$dtype='float32',
-    Maybe[AI::MXNet::NDArray] :$out=
+    Maybe[AI::MXNet::NDArray] :$out=,
+    Maybe[Str] :$name=
 )
 {
     return __PACKAGE__->_zeros({ shape => $shape, ctx => "$ctx", dtype => $dtype, ($out ? (out => $out) : ())  });
@@ -992,7 +993,8 @@ method ones(
     Shape $shape,
     AI::MXNet::Context :$ctx=AI::MXNet::Context->current_ctx,
     Dtype :$dtype='float32',
-    Maybe[AI::MXNet::NDArray] :$out=
+    Maybe[AI::MXNet::NDArray] :$out=,
+    Maybe[Str] :$name=
 )
 {
     return __PACKAGE__->_ones({ shape => $shape, ctx => "$ctx", dtype => $dtype, ($out ? (out => $out) : ()) });
@@ -1025,7 +1027,8 @@ method ones(
 method full(
     Shape $shape, Num $val,
     AI::MXNet::Context :$ctx=AI::MXNet::Context->current_ctx,
-    Dtype :$dtype='float32', Maybe[AI::MXNet::NDArray] :$out=
+    Dtype :$dtype='float32', Maybe[AI::MXNet::NDArray] :$out=,
+    Maybe[Str] :$name=
 )
 {
     return __PACKAGE__->_set_value({ src => $val, out => $out ? $out : __PACKAGE__->empty($shape, ctx => $ctx, dtype => $dtype) });
