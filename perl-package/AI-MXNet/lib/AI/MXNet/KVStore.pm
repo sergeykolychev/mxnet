@@ -251,8 +251,7 @@ method set_optimizer(AI::MXNet::Optimizer $optimizer)
     }
     else
     {
-        $self->_updater(AI::MXNet::Optimizer->get_updater($optimizer));
-        $self->_set_updater(sub { &{$self->_updater}(@_) });
+        $self->_set_updater(AI::MXNet::Optimizer->get_updater($optimizer));
     }
 }
 
@@ -371,7 +370,7 @@ method load_optimizer_states(Str $fname)
         [ 6.  6.  6.]]
 =cut
 
-method _set_updater(CodeRef $updater_func)
+method _set_updater(AI::MXNet::Updater $updater_func)
 {
     $self->_updater_func(
         sub {
