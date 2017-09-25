@@ -15,9 +15,10 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
+sudo ln -s /usr/local/cuda/lib64/stubs/libcuda.so /usr/local/cuda/lib64/stubs/libcuda.so.1
 
 MXNET_HOME=${PWD}
-export LD_LIBRARY_PATH=${MXNET_HOME}/lib
+export LD_LIBRARY_PATH=/usr/local/cuda/lib64/stubs/:${MXNET_HOME}/lib
 export PERL5LIB=${MXNET_HOME}/perl5/lib/perl5
 
 cd ${MXNET_HOME}/perl-package/AI-MXNetCAPI/
