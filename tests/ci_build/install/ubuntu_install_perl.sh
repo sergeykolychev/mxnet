@@ -18,5 +18,6 @@
 # under the License.
 
 # install libraries for mxnet's perl package on ubuntu
-apt-get update && apt-get install -y libmouse-perl pdl cpanminus swig libgraphviz-perl
+add-apt-repository -y ppa:graphics-drivers
+apt-get update && apt-get install -y libmouse-perl pdl cpanminus swig libgraphviz-perl libcuda1-340
 cpanm -q Function::Parameters
