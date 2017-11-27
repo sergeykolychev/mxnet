@@ -114,9 +114,13 @@ method at(Index @indices)
 
 method len() { $self->shape->[0] }
 
-method slice(Slice|AdvancedSlice @slices)
+method slice(Slice|AdvancedSlice|InternalSlice @slices)
 {
     confess("No slices supplied") unless @slices;
+    if(grep { not ref and /^(?:begin|end|slice)$/ } @slices)
+    {
+        return $self->SUPER::slice(@slices);
+    }
     if(ref $slices[0] eq 'ARRAY' and ref $slices[0]->[0])
     {
         my @indices;
@@ -1386,15 +1390,36 @@ sub _new_empty_handle
 
 func _new_alloc_handle($shape, $ctx, $delay_alloc, $dtype)
 {
-    my $hdl = check_call(AI::MXNetCAPI::NDArrayCreateEx(
-        $shape,
-        scalar(@$shape),
-        $ctx->device_type_id,
-        $ctx->device_id,
-        $delay_alloc,
-        $dtype)
+    my $hdl = check_call(
+        AI::MXNetCAPI::NDArrayCreateEx(
+            $shape,
+            scalar(@$shape),
+            $ctx->device_type_id,
+            $ctx->device_id,
+            $delay_alloc,
+            $dtype
+        )
     );
     return $hdl;
+}
+
+method _new_from_shared_mem($shared_pid, $shared_id, $shape, $dtype)
+{
+    my $hdl = check_call(
+        AI::MXNetCAPI::NDArrayCreateFromSharedMem(
+            $shared_pid,
+            $shared_id,
+            $shape,
+            scalar(@$shape),
+            DTYPE_STR_TO_MX->{$dtype}
+        )
+    );
+    return $hdl;
+}
+
+method _storage_type($handle)
+{
+    scalar(check_call(AI::MXNetCAPI::NDArrayGetStorageType($handle, 0)));
 }
 
 =head2 waitall
