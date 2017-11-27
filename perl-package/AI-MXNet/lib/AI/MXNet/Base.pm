@@ -32,7 +32,10 @@ use List::Util qw(shuffle);
 @AI::MXNet::Base::EXPORT = qw(product enumerate assert zip check_call build_param_doc
                               pdl cat dog svd bisect_left pdl_shuffle as_array
                               DTYPE_STR_TO_MX DTYPE_MX_TO_STR DTYPE_MX_TO_PDL
-                              DTYPE_PDL_TO_MX DTYPE_MX_TO_PERL GRAD_REQ_MAP);
+                              DTYPE_PDL_TO_MX DTYPE_MX_TO_PERL GRAD_REQ_MAP
+                              STORAGE_TYPE_UNDEFINED STORAGE_TYPE_DEFAULT
+                              STORAGE_TYPE_ROW_SPARSE STORAGE_TYPE_CSR
+                              STORAGE_TYPE_STR_TO_ID STORAGE_TYPE_ID_TO_STR STORAGE_AUX_TYPES);
 @AI::MXNet::Base::EXPORT_OK = qw(pzeros pceil);
 
 use constant DTYPE_STR_TO_MX => {
@@ -97,6 +100,29 @@ use constant GRAD_REQ_MAP => {
     write => 1,
     add   => 3
 };
+use constant {
+    STORAGE_TYPE_UNDEFINED  => -1,
+    STORAGE_TYPE_DEFAULT    =>  0,
+    STORAGE_TYPE_ROW_SPARSE =>  1,
+    STORAGE_TYPE_CSR        =>  2
+};
+use constant STORAGE_TYPE_STR_TO_ID => {
+    undefined  => STORAGE_TYPE_UNDEFINED,
+    default    => STORAGE_TYPE_DEFAULT,
+    row_sparse => STORAGE_TYPE_ROW_SPARSE,
+    csr        => STORAGE_TYPE_CSR
+};
+use constant STORAGE_TYPE_ID_TO_STR => {
+    STORAGE_TYPE_UNDEFINED  => 'undefined',
+    STORAGE_TYPE_DEFAULT    => 'default',
+    STORAGE_TYPE_ROW_SPARSE => 'row_sparse',
+    STORAGE_TYPE_CSR        => 'csr'
+};
+use constant STORAGE_AUX_TYPES => {
+    row_sparse => ['int64'],
+    csr => ['int64', 'int64']
+};
+
 
 =head1 NAME
 
