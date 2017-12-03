@@ -350,184 +350,210 @@ method slice(Slice $slice)
     return $self->SUPER::slice(begin => $begin, end => $end);
 }
 
-    def __setitem__(self, key, value):
-        """x.__setitem__(i, y) <=> x[i]=y
 
-        Set self[key] to value. Only slice key [:] is supported.
+=head2 set
+
+        Set self to value. Also usable as overloaded .=
 
         Parameters
         ----------
-        key : slice
-            The indexing key.
-        value : NDArray or CSRNDArray or numpy.ndarray
+        value : AI::MXNet::NDArray or AI::MXNet::NDArray::CSR
+                or PDL/PDL::CCS::Nd/perl array ref in PDL constructor format
             The value to set.
 
         Examples
         --------
-        >>> src = mx.nd.sparse.zeros('csr', (3,3))
-        >>> src.asnumpy()
-        array([[ 0.,  0.,  0.],
-               [ 0.,  0.,  0.],
-               [ 0.,  0.,  0.]], dtype=float32)
-        >>> # assign CSRNDArray with same storage type
-        >>> x = mx.nd.ones('row_sparse', (3,3)).tostype('csr')
-        >>> x[:] = src
-        >>> x.asnumpy()
-        array([[ 1.,  1.,  1.],
-               [ 1.,  1.,  1.],
-               [ 1.,  1.,  1.]], dtype=float32)
-        >>> # assign NDArray to CSRNDArray
-        >>> x[:] = mx.nd.ones((3,3)) * 2
-        >>> x.asnumpy()
-        array([[ 2.,  2.,  2.],
-               [ 2.,  2.,  2.],
-               [ 2.,  2.,  2.]], dtype=float32)
-        """
-        if not self.writable:
-            raise ValueError('Failed to assign to a readonly CSRNDArray')
-        if isinstance(key, py_slice):
-            if key.step is not None or key.start is not None or key.stop is not None:
-                raise ValueError('Assignment with slice for CSRNDArray is not ' \
-                                 'implmented yet.')
-            if isinstance(value, NDArray):
-                # avoid copying to itself
-                if value.handle is not self.handle:
-                    value.copyto(self)
-            elif isinstance(value, numeric_types):
-                raise ValueError("Assigning numeric types to CSRNDArray is " \
-                                 "not implemented yet.")
-            elif isinstance(value, (np.ndarray, np.generic)):
-                # TODO(haibin/anisub) check scipy.sparse and use _sync_copy_from to
-                # avoid the temporary copy
-                warnings.warn('Assigning non-NDArray object to CSRNDArray is not efficient',
-                              RuntimeWarning)
-                tmp = _array(value)
-                tmp.copyto(self)
-            else:
-                raise TypeError('type %s not supported' % str(type(value)))
-        else:
-            assert(isinstance(key, (int, tuple)))
-            raise Exception('CSRNDArray only supports [:] for assignment')
+        >>> $src = mx->nd->sparse->zeros('csr', [3,3])
+        >>> $src->aspdl
+              [[ 0  0  0]
+               [ 0  0  0]
+               [ 0  0  0]]
+        >>> # AI::MXNet::NDArray::CSR with same storage type
+        >>> $x = mx->nd->ones('row_sparse', [3,3])->tostype('csr')
+        >>> $x .= $src
+        >>> $x->aspdl
+              [[ 1  1  1]
+               [ 1  1  1]
+               [ 1  1  1]]
+        >>> # assign NDArray to AI::MXNet::NDArray::CSR
+        >>> $x .= mx->nd->ones([3,3]) * 2
+        >>> $x->aspdl
+              [[ 2  2  2]
+               [ 2  2  2]
+               [ 2  2  2]]
+=cut
 
-    @property
-    def indices(self):
-        """A deep copy NDArray of the indices array of the CSRNDArray.
+method set(CSRSetInput $other)
+{
+    confess('Failed to assign to a readonly CSR') unless $self->writable;
+    if($other->isa('AI::MXNet::NDArray'))
+    {
+        if($self->handle ne $other->handle)
+        {
+            $other->copyto($self);
+        }
+    }
+    else
+    {
+        my $tmp = _array($value);
+        $tmp->copyto($self);
+    }
+}
+
+use overload '.=' => \&set;
+
+=head2 indices
+
+        A deep copy NDArray of the indices array of the AI::MXNet::NDArray::CSR.
         This generates a deep copy of the column indices of the current `csr` matrix.
 
         Returns
         -------
         NDArray
-            This CSRNDArray's indices array.
-        """
-        return self._aux_data(1)
+            This AI::MXNet::NDArray::CSR indices array.
+=cut
 
-    @property
-    def indptr(self):
-        """A deep copy NDArray of the indptr array of the CSRNDArray.
-        This generates a deep copy of the `indptr` of the current `csr` matrix.
+method indices()
+{
+    return $self->_aux_data(1);
+}
 
-        Returns
-        -------
-        NDArray
-            This CSRNDArray's indptr array.
-        """
-        return self._aux_data(0)
+=head2 indptr
 
-    @property
-    def data(self):
-        """A deep copy NDArray of the data array of the CSRNDArray.
-        This generates a deep copy of the `data` of the current `csr` matrix.
+        A deep copy NDArray of the inptr array of the AI::MXNet::NDArray::CSR.
+        This generates a deep copy of the indptr of the current `csr` matrix.
 
         Returns
         -------
         NDArray
-            This CSRNDArray's data array.
-        """
-        return self._data()
+            This AI::MXNet::NDArray::CSR indptr array.
+=cut
 
-    @indices.setter
-    def indices(self, indices):
-        raise NotImplementedError()
+method indptr()
+{
+    return $self->_aux_data(0);
+}
 
-    @indptr.setter
-    def indptr(self, indptr):
-        raise NotImplementedError()
+=head2 data
 
-    @data.setter
-    def data(self, data):
-        raise NotImplementedError()
-
-
-    def tostype(self, stype):
-        """Return a copy of the array with chosen storage type.
+        A deep copy NDArray of the data array of the AI::MXNet::NDArray::CSR.
+        This generates a deep copy of the data of the current `csr` matrix.
 
         Returns
         -------
-        NDArray or CSRNDArray
+        NDArray
+            This AI::MXNet::NDArray::CSR data array.
+=cut
+
+method data()
+{
+    return $self->_data;
+}
+
+=head2 tostype
+
+        Return a copy of the array with chosen storage type.
+
+        Returns
+        -------
+        NDArray or AI::MXNet::NDArray::CSR 
             A copy of the array with the chosen storage stype
-        """
-        if stype == 'row_sparse':
-            raise ValueError("cast_storage from csr to row_sparse is not supported")
-        return op.cast_storage(self, stype=stype)
+=cut
 
-    def copyto(self, other):
-        """Copies the value of this array to another array.
+method tostype(Stype $stype)
+{
+    if($stype eq 'row_sparse')
+    {
+        confess("cast_storage from csr to row_sparse is not supported");
+    }
+    return $self->cast_storage(stype => $stype);
+}
 
-        If ``other`` is a ``NDArray`` or ``CSRNDArray`` object, then ``other.shape`` and
-        ``self.shape`` should be the same. This function copies the value from
-        ``self`` to ``other``.
+=head2 copyto
 
-        If ``other`` is a context, a new ``CSRNDArray`` will be first created on
-        the target context, and the value of ``self`` is copied.
+        Copies the value of this array to another array.
+
+        If $other is a AI::MXNet::NDArray or AI::MXNet::NDArray::CSR object, then $other->shape and
+        $self->shape should be the same. This function copies the value from
+        $self to $other.
+
+        If $other is a context, a new AI::MXNet::NDArray::CSR will be first created on
+        the target context, and the value of $self is copied.
 
         Parameters
         ----------
-        other : NDArray or CSRNDArray or Context
+        $other : AI::MXNet::NDArray or AI::MXNet::NDArray::CSR or AI::MXNet::Context
             The destination array or context.
 
         Returns
         -------
-        NDArray or CSRNDArray
-            The copied array. If ``other`` is an ``NDArray`` or ``CSRNDArray``, then the return
-            value and ``other`` will point to the same ``NDArray`` or ``CSRNDArray``.
-        """
-        if isinstance(other, Context):
-            return super(CSRNDArray, self).copyto(other)
-        elif isinstance(other, NDArray):
-            stype = other.stype
-            if stype == 'default' or stype == 'csr':
-                return super(CSRNDArray, self).copyto(other)
-            else:
-                raise TypeError('copyto does not support destination NDArray stype ' + str(stype))
-        else:
-            raise TypeError('copyto does not support type ' + str(type(other)))
+        AI::MXNet::NDArray or AI::MXNet::NDArray::CSR
+=cut
 
-    def asscipy(self):
-        """Returns a ``scipy.sparse.csr.csr_matrix`` object with value copied from this array
+method copyto(AI::MXNet::Context|AI::MXNet::NDArray $other)
+{
+    if($other->isa('AI::MXNet::Context'))
+    {
+        return $self->SUPER::copyto($other);
+    }
+    else
+    {
+        my $stype = $other->stype;
+        if($stype eq 'default' or $stype eq 'csr')
+        {
+            return return $self->SUPER::copyto($other);
+        }
+        else
+        {
+            confess("copyto does not support destination NDArray stype $stype");
+        }
+    }
+}
 
-        Examples
-        --------
-        >>> x = mx.nd.sparse.zeros('csr', (2,3))
-        >>> y = x.asscipy()
-        >>> type(y)
-        <type 'scipy.sparse.csr.csr_matrix'>
-        >>> y
-        <2x3 sparse matrix of type '<type 'numpy.float32'>'
-        with 0 stored elements in Compressed Sparse Row format>
-        """
-        data = self.data.asnumpy()
-        indices = self.indices.asnumpy()
-        indptr = self.indptr.asnumpy()
-        if not spsp:
-            raise ImportError("scipy is not available. \
-                               Please check if the scipy python bindings are installed.")
-        return spsp.csr_matrix((data, indices, indptr), shape=self.shape, dtype=self.dtype)
+=head2
 
-# pylint: disable=abstract-method
-class RowSparseNDArray(BaseSparseNDArray):
-    """A sparse representation of a set of NDArray row slices at given indices.
+    Returns a PDL::CCS::Nd object with value copied from this array
+=cut
 
-    A RowSparseNDArray represents a multidimensional NDArray using two separate arrays: `data` and
+method aspdlccs()
+{
+    my $data    = $self->data->aspdl;
+    my $indices = $self->indices->aspdl;
+    my $indptr  = $self->indptr->aspdl;
+    return ascsr($self->data->aspdl, $self->indptr->aspdl, $self->indices->aspdl, $self->shape);
+}
+
+sub ascsr
+{
+    my ($data, $indptr, $indices, $shape) = @_;
+    my @which;
+    my $i = 0;
+    my $j = 0;
+    while($i < $indices->nelem)
+    {
+        for($i = $indptr->at($j); $i < $indptr->at($j+1); $i++)
+        {
+            push @which, [$j, $indices->at($i)];
+        }
+        $j++;
+    }
+    return PDL::CCS::Nd->newFromWhich(
+            pdl(\@which), $data, pdims => blessed $shape ? $shape : pdl($shape)
+    )->xchg(0, 1);
+}
+
+package AI::MXNet::NDArray::RowSparse;
+use Mouse;
+extends 'AI::MXNet::NDArray::Sparse::Base';
+
+=head1 NAME
+
+    AI::MXNet::NDArray::RowSparse - A sparse representation of a set of NDArray row slices at given indices.
+=cut
+
+=head1 DESCRIPTION
+
+    A AI::MXNet::NDArray::RowSparse represents a multidimensional NDArray using two separate arrays: `data` and
     `indices`. The number of dimensions has to be at least 2.
 
     - data: an NDArray of any dtype with shape [D0, D1, ..., Dn].
@@ -535,445 +561,427 @@ class RowSparseNDArray(BaseSparseNDArray):
 
     The `indices` stores the indices of the row slices with non-zeros,
     while the values are stored in `data`. The corresponding NDArray ``dense``
-    represented by RowSparseNDArray ``rsp`` has
+    represented by AI::MXNet::NDArray::RowSparse ``rsp`` has
 
     ``dense[rsp.indices[i], :, :, :, ...] = rsp.data[i, :, :, :, ...]``
 
-        >>> dense.asnumpy()
-        array([[ 1.,  2., 3.],
-               [ 0.,  0., 0.],
-               [ 4.,  0., 5.],
-               [ 0.,  0., 0.],
-               [ 0.,  0., 0.]], dtype=float32)
-        >>> rsp = dense.tostype('row_sparse')
-        >>> rsp.indices.asnumpy()
-        array([0, 2], dtype=int64)
-        >>> rsp.data.asnumpy()
-        array([[ 1.,  2., 3.],
-               [ 4.,  0., 5.]], dtype=float32)
+        >>> $dense->aspdl
+              [[ 1  2  3 ]
+               [ 0  0  0 ]
+               [ 4  0  5 ]
+               [ 0  0  0 ]
+               [ 0  0  0 ]]
+        >>> $rsp = $dense->tostype('row_sparse');
+        >>> $rsp->indices->aspdl
+              [ 0 2 ]
+        >>> $rsp->data->aspdl
+              [[ 1  2 3 ]
+               [ 4  0 5 ]]
 
-    A RowSparseNDArray is typically used to represent non-zero row slices of a large NDArray
+    A AI::MXNet::NDArray::RowSparse is typically used to represent non-zero row slices of a large NDArray
     of shape [LARGE0, D1, .. , Dn] where LARGE0 >> D0 and most row slices are zeros.
 
-    RowSparseNDArray is used principally in the definition of gradients for operations
+    AI::MXNet::NDArray::RowSparse is used principally in the definition of gradients for operations
     that have sparse gradients (e.g. sparse dot and sparse embedding).
 
     See Also
     --------
-    row_sparse_array: Several ways to construct a RowSparseNDArray
-    """
-    def __reduce__(self):
-        return RowSparseNDArray, (None,), super(RowSparseNDArray, self).__getstate__()
+    row_sparse_array: Several ways to construct a AI::MXNet::NDArray::RowSparse
+=cut
 
-    def __iadd__(self, other):
-        (self + other).copyto(self)
-        return self
+use overload '+=' => sub { ($_[0] + $_[1])->copyto($_[0]) },
+             '-=' => sub { ($_[0] - $_[1])->copyto($_[0]) },
+             '*=' => sub { ($_[0] * $_[1])->copyto($_[0]) },
+             '/=' => sub { ($_[0] / $_[1])->copyto($_[0]) };
 
-    def __isub__(self, other):
-        (self - other).copyto(self)
-        return self
+method slice(@args) { confess("not implemented") }
 
-    def __imul__(self, other):
-        (self * other).copyto(self)
-        return self
+=head2 set
 
-    def __idiv__(self, other):
-        (self / other).copyto(self)
-        return self
-
-    def __itruediv__(self, other):
-        (self / other).copyto(self)
-        return self
-
-    def __getitem__(self, key):
-        """x.__getitem__(i) <=> x[i]
-
-        Returns a sliced view of this array.
+        Set self to value. Also usable as overloaded .=
 
         Parameters
         ----------
-        key : slice
-            Indexing key.
-
-        Examples
-        --------
-        >>> x = mx.nd.sparse.zeros('row_sparse', (2, 3))
-        >>> x[:].asnumpy()
-        array([[ 0.,  0.,  0.],
-               [ 0.,  0.,  0.]], dtype=float32)
-        """
-        if isinstance(key, int):
-            raise Exception("__getitem__ with int key is not implemented for RowSparseNDArray yet")
-        if isinstance(key, py_slice):
-            if key.step is not None or key.start is not None or key.stop is not None:
-                raise Exception('RowSparseNDArray only supports [:] for __getitem__')
-            else:
-                return self
-        if isinstance(key, tuple):
-            raise ValueError('Multi-dimension indexing is not supported')
-
-    def __setitem__(self, key, value):
-        """x.__setitem__(i, y) <=> x[i]=y
-
-        Set self[key] to value. Only slice key [:] is supported.
-
-        Parameters
-        ----------
-        key : slice
-            The indexing key.
-        value : NDArray or numpy.ndarray
+        value : AI::MXNet::NDArray or AI::MXNet::NDArray::CSR
+                or PDL/PDL::CCS::Nd/perl array ref in PDL constructor format
             The value to set.
 
         Examples
         --------
-        >>> src = mx.nd.row_sparse([[1, 0, 2], [4, 5, 6]], [0, 2], (3,3))
-        >>> src.asnumpy()
-        array([[ 1.,  0.,  2.],
-               [ 0.,  0.,  0.],
-               [ 4.,  5.,  6.]], dtype=float32)
-        >>> # assign RowSparseNDArray with same storage type
-        >>> x = mx.nd.sparse.zeros('row_sparse', (3,3))
-        >>> x[:] = src
-        >>> x.asnumpy()
-        array([[ 1.,  0.,  2.],
-               [ 0.,  0.,  0.],
-               [ 4.,  5.,  6.]], dtype=float32)
-        >>> # assign NDArray to RowSparseNDArray
-        >>> x[:] = mx.nd.ones((3,3))
-        >>> x.asnumpy()
-        array([[ 1.,  1.,  1.],
-               [ 1.,  1.,  1.],
-               [ 1.,  1.,  1.]], dtype=float32)
-        """
-        if not self.writable:
-            raise ValueError('Failed to assign to a readonly RowSparseNDArray')
-        if isinstance(key, py_slice):
-            if key.step is not None or key.start is not None or key.stop is not None:
-                raise ValueError('Assignment with slice for RowSparseNDArray ' \
-                                 'is not implmented yet.')
-            if isinstance(value, NDArray):
-                # avoid copying to itself
-                if value.handle is not self.handle:
-                    value.copyto(self)
-            elif isinstance(value, numeric_types):
-                raise ValueError("Assigning numeric types to RowSparseNDArray " \
-                                 "is not implemented yet.")
-            elif isinstance(value, (np.ndarray, np.generic)):
-                warnings.warn('Assigning non-NDArray object to RowSparseNDArray is not efficient',
-                              RuntimeWarning)
-                tmp = _array(value)
-                tmp.copyto(self)
-            else:
-                raise TypeError('type %s not supported' % str(type(value)))
-        else:
-            assert(isinstance(key, (int, tuple)))
-            raise TypeError('RowSparseNDArray only supports [:] for assignment')
+        >>> $src = mx->nd->sparse->zeros('raw_sparse', [3,3])
+        >>> $src->aspdl
+              [[ 0  0  0]
+               [ 0  0  0]
+               [ 0  0  0]]
+        >>> # AI::MXNet::NDArray::RowSparse with same storage type
+        >>> $x = mx->nd->ones('row_sparse', [3,3])
+        >>> $src .= $x
+        >>> $src->aspdl
+              [[ 1  1  1]
+               [ 1  1  1]
+               [ 1  1  1]]
+        >>> # assign NDArray to AI::MXNet::NDArray::RowSparse
+        >>> $x .= mx->nd->ones([3,3]) * 2
+        >>> $x->aspdl
+              [[ 2  2  2]
+               [ 2  2  2]
+               [ 2  2  2]]
+=cut
 
-    @property
-    def indices(self):
-        """A deep copy NDArray of the indices array of the RowSparseNDArray.
-        This generates a deep copy of the row indices of the current `row_sparse` matrix.
+method set(RowSparseSetInput $other)
+{
+    confess('Failed to assign to a readonly CSR') unless $self->writable;
+    if($other->isa('AI::MXNet::NDArray'))
+    {
+        if($self->handle ne $other->handle)
+        {
+            $other->copyto($self);
+        }
+    }
+    else
+    {
+        my $tmp = _array($value);
+        $tmp->copyto($self);
+    }
+}
+
+use overload '.=' => \&set;
+
+=head2 indices
+
+        A deep copy NDArray of the indices array of the AI::MXNet::NDArray::RowSparse.
+        This generates a deep copy of the column indices of the current `row_sparse` matrix.
 
         Returns
         -------
         NDArray
-            This RowSparseNDArray's indices array.
-        """
-        return self._aux_data(0)
+            This AI::MXNet::NDArray::RowSparse indices array.
+=cut
 
-    @property
-    def data(self):
-        """A deep copy NDArray of the data array of the RowSparseNDArray.
-        This generates a deep copy of the `data` of the current `row_sparse` matrix.
+method indices()
+{
+    return $self->_aux_data(0);
+}
+
+=head2 data
+
+        A deep copy NDArray of the data array of the AI::MXNet::NDArray::RowSparse.
+        This generates a deep copy of the data of the current `row_sparse` matrix.
 
         Returns
         -------
         NDArray
-            This RowSparseNDArray's data array.
-        """
-        return self._data()
+            This AI::MXNet::NDArray::RowSparse data array.
+=cut
 
-    @indices.setter
-    def indices(self, indices):
-        raise NotImplementedError()
+=head2 tostype
 
-    @data.setter
-    def data(self, data):
-        raise NotImplementedError()
-
-    def tostype(self, stype):
-        """Return a copy of the array with chosen storage type.
+        Return a copy of the array with chosen storage type.
 
         Returns
         -------
         NDArray or RowSparseNDArray
             A copy of the array with the chosen storage stype
-        """
-        if stype == 'csr':
-            raise ValueError("cast_storage from row_sparse to csr is not supported")
-        return op.cast_storage(self, stype=stype)
+=cut
 
-    def copyto(self, other):
-        """Copies the value of this array to another array.
+method tostype(Stype $stype)
+{
+    if($stype eq 'csr')
+    {
+        confess("cast_storage from row_sparse to csr is not supported");
+    }
+    return $self->cast_storage(stype => $stype);
+}
 
-        If ``other`` is a ``NDArray`` or ``RowSparseNDArray`` object, then ``other.shape``
-        and ``self.shape`` should be the same. This function copies the value from
-        ``self`` to ``other``.
 
-        If ``other`` is a context, a new ``RowSparseNDArray`` will be first created on
-        the target context, and the value of ``self`` is copied.
+=head2 copyto
+
+        Copies the value of this array to another array.
+
+        If $other is a AI::MXNet::NDArray or AI::MXNet::NDArray::RawSparse object, then $other->shape and
+        $self->shape should be the same. This function copies the value from
+        $self to $other.
+
+        If $other is a context, a new AI::MXNet::NDArray::RawSparse will be first created on
+        the target context, and the value of $self is copied.
 
         Parameters
         ----------
-        other : NDArray or RowSparseNDArray or Context
+        $other : AI::MXNet::NDArray or AI::MXNet::NDArray::RawSparse or AI::MXNet::Context
             The destination array or context.
 
         Returns
         -------
-        NDArray or RowSparseNDArray
-            The copied array. If ``other`` is an ``NDArray`` or ``RowSparseNDArray``, then the
-            return value and ``other`` will point to the same ``NDArray`` or ``RowSparseNDArray``.
-        """
-        if isinstance(other, Context):
-            return super(RowSparseNDArray, self).copyto(other)
-        elif isinstance(other, NDArray):
-            stype = other.stype
-            if stype == 'default' or stype == 'row_sparse':
-                return super(RowSparseNDArray, self).copyto(other)
-            else:
-                raise TypeError('copyto does not support destination NDArray stype ' + str(stype))
-        else:
-            raise TypeError('copyto does not support type ' + str(type(other)))
+        AI::MXNet::NDArray or AI::MXNet::NDArray::RawSparse
+=cut
 
-    def retain(self, *args, **kwargs):
-        """Convenience fluent method for :py:func:`retain`.
+method copyto(AI::MXNet::Context|AI::MXNet::NDArray $other)
+{
+    if($other->isa('AI::MXNet::Context'))
+    {
+        return $self->SUPER::copyto($other);
+    }
+    else
+    {
+        my $stype = $other->stype;
+        if($stype eq 'default' or $stype eq 'row_sparse')
+        {
+            return return $self->SUPER::copyto($other);
+        }
+        else
+        {
+            confess("copyto does not support destination NDArray stype $stype");
+        }
+    }
+}
 
-        The arguments are the same as for :py:func:`retain`, with
-        this array as data.
-        """
-        return retain(self, *args, **kwargs)
+package AI::MXNet::NDArray::Sparse::Base;
 
-def _prepare_src_array(source_array, dtype):
-    """Prepare `source_array` so that it can be used to construct NDArray.
-    `source_array` is converted to a `np.ndarray` if it's neither an `NDArray` \
-    nor an `np.ndarray`.
-    """
-    if not isinstance(source_array, NDArray) and not isinstance(source_array, np.ndarray):
-        try:
-            source_array = np.array(source_array, dtype=dtype)
-        except:
-            raise TypeError('values must be array like object')
-    return source_array
+# Prepare `source_array` so that it can be used to construct NDArray.
+# `source_array` is converted to a `pdl` if it's neither an `NDArray`
+# nor a `pdl`.
 
-def _prepare_default_dtype(src_array, dtype):
-    """Prepare the value of dtype if `dtype` is None. If `src_array` is an NDArray, numpy.ndarray
-    or scipy.sparse.csr.csr_matrix, return src_array.dtype. float32 is returned otherwise."""
-    if dtype is None:
-        if isinstance(src_array, (NDArray, np.ndarray)):
-            dtype = src_array.dtype
-        elif spsp and isinstance(src_array, spsp.csr.csr_matrix):
-            dtype = src_array.dtype
-        else:
-            dtype = mx_real_t
-    return dtype
+method _prepare_src_array($source_array, Dtype $dtype)
+{
+    my $pdl_type = PDL::Type->new(DTYPE_MX_TO_PDL->{ $dtype });
+    if(not blessed($source_array))
+    {
+        $source_array = eval {
+            pdl($pdl_type, $source_array);
+        };
+        confess($@) if $@;
+    }
+    elsif($source_array->isa('AI::MXNet::NDArray'))
+    {
+        return $source_array;
+    }
+    $source_array = pdl($pdl_type, [@{ $source_array->unpdl } ? $source_array->unpdl->[0] : 0 ]) unless @{ $source_array->shape->unpdl };
+    return $source_array;
+}
 
-def _check_shape(s1, s2):
-    """check s1 == s2 if both are not None"""
-    if s1 and s2 and s1 != s2:
-        raise ValueError("Shape mismatch detected. " + str(s1) + " v.s. " + str(s2))
 
-def csr_matrix(arg1, shape=None, ctx=None, dtype=None):
-    """Creates a `CSRNDArray`, an 2D array with compressed sparse row (CSR) format.
+# Prepare the value of dtype if `dtype` is undef. If `src_array` is an NDArray, PDL
+# or PDL::CCS::Ne, return src_array->dtype. float32 is returned otherwise.
 
-    The CSRNDArray can be instantiated in several ways:
+method _prepare_default_dtype($src_array, $dtype)
+{
+    if(not defined $dtype)
+    {
+        if(blessed $src_array)
+        {
+            $dtype = $src_array->dtype;
+        }
+        else
+        {
+            $dtype = 'float32';
+        }
+    }
+    return $dtype;
+}
 
-    - csr_matrix(D):
-        to construct a CSRNDArray with a dense 2D array ``D``
-            -  **D** (*array_like*) - An object exposing the array interface, an object whose \
-            `__array__` method returns an array, or any (nested) sequence.
-            - **ctx** (*Context, optional*) - Device context \
-            (default is the current default context).
-            - **dtype** (*str or numpy.dtype, optional*) - The data type of the output array. \
-            The default dtype is ``D.dtype`` if ``D`` is an NDArray or numpy.ndarray, \
-            float32 otherwise.
+use Data::Dumper;
+method _check_shape($s1, $s2)
+{
+    if ($s1 and $s2 and and Dumper($s1) ne Dumper($s2))
+    {
+        confess("Shape mismatch detected. " . Dumper($s1) . " v.s. " . Dumper($s2));
+    }
+}
 
-    - csr_matrix(S)
-        to construct a CSRNDArray with a sparse 2D array ``S``
-            -  **S** (*CSRNDArray or scipy.sparse.csr.csr_matrix*) - A sparse matrix.
-            - **ctx** (*Context, optional*) - Device context \
-            (default is the current default context).
-            - **dtype** (*str or numpy.dtype, optional*) - The data type of the output array. \
-            The default dtype is ``S.dtype``.
+=head2 csr_matrix
 
-    - csr_matrix((M, N))
-        to construct an empty CSRNDArray with shape ``(M, N)``
-            -  **M** (*int*) - Number of rows in the matrix
-            -  **N** (*int*) - Number of columns in the matrix
-            - **ctx** (*Context, optional*) - Device context \
-            (default is the current default context).
-            - **dtype** (*str or numpy.dtype, optional*) - The data type of the output array. \
-            The default dtype is float32.
+    Creates a AI::MXNet::NDArray::CSR, an 2D array with compressed sparse row (CSR) format.
 
-    - csr_matrix((data, indices, indptr))
-        to construct a CSRNDArray based on the definition of compressed sparse row format \
-        using three separate arrays, \
-        where the column indices for row i are stored in ``indices[indptr[i]:indptr[i+1]]`` \
-        and their corresponding values are stored in ``data[indptr[i]:indptr[i+1]]``. \
-        The column indices for a given row are expected to be **sorted in ascending order.** \
+    The AI::MXNet::NDArray::CSR can be instantiated in several ways:
+
+    - csr_matrix($arg1, Maybe[AI::MXNet::Context] :$ctx=, Maybe[Shape] :$shape, Maybe [Dtype] :$dtype=)
+        $ctx, $shape, $dtype are optional
+        $D can be given in following variants
+
+    - to construct a AI::MXNet::NDArray::CSR with a dense 2D array $arg1
+            - $arg1 is in AI::MXNet::NDArray::array input format
+
+    - to construct a AI::MXNet::NDArray::CSR with a sparse 2D array $arg1
+            $arg1 is AI::MXNet::NDArray::CSR or PDL::CCS::Nd - A sparse matrix.
+            PDL::CCS::Nd is expected to be converted internally into CSR format
+            AI::MXNet injects 'tocsr' method into PDL and PDL::CCS::Nd modules for this purpose.
+
+     - to construct an empty AI::MXNet::NDArray::CSR with shape $arg1 = [$M, $N]
+            -  $M - Number of rows in the matrix
+            -  $N - Number of columns in the matrix
+
+    - to construct a AI::MXNet::NDArray::CSR based on the definition of compressed sparse row format
+        using three separate arrays,
+        where the column indices for row i are stored in ``indices[indptr[i]:indptr[i+1]]``
+        and their corresponding values are stored in ``data[indptr[i]:indptr[i+1]]``.
+        The column indices for a given row are expected to be **sorted in ascending order.**
         Duplicate column entries for the same row are not allowed.
-            - **data** (*array_like*) - An object exposing the array interface, which \
-            holds all the non-zero entries of the matrix in row-major order.
-            - **indices** (*array_like*) - An object exposing the array interface, which \
-            stores the column index for each non-zero element in ``data``.
-            - **indptr** (*array_like*) - An object exposing the array interface, which \
-            stores the offset into ``data`` of the first non-zero element number of each \
+        In this case $arg1 = [$data, $indices, $indptr]
+            $data, $indices, $indptr must be given in the AI::MXNet::NDArray::array input format
+            - $data - holds all the non-zero entries of the matrix in row-major order.
+            - $indices - stores the column index for each non-zero element in $data.
+            stores the column index for each non-zero element in $data.
+            - $indptr  - stores the offset into $data of the first non-zero element number of each
             row of the matrix.
-            - **shape** (*tuple of int, optional*) - The shape of the array. The default \
-            shape is inferred from the indices and indptr arrays.
-            - **ctx** (*Context, optional*) - Device context \
-            (default is the current default context).
-            - **dtype** (*str or numpy.dtype, optional*) - The data type of the output array. \
-            The default dtype is ``data.dtype`` if ``data`` is an NDArray or numpy.ndarray, \
-            float32 otherwise.
 
-    - csr_matrix((data, (row, col)))
-        to construct a CSRNDArray based on the COOrdinate format \
-        using three seperate arrays, \
+        to construct a AI::MXNet::NDArray::CSR based on the COOrdinate format
+        using three seperate arrays, 
         where ``row[i]`` is the row index of the element, \
         ``col[i]`` is the column index of the element \
         and ``data[i]`` is the data corresponding to the element. All the missing \
         elements in the input are taken to be zeroes.
-            - **data** (*array_like*) - An object exposing the array interface, which \
-            holds all the non-zero entries of the matrix in COO format.
-            - **row** (*array_like*) - An object exposing the array interface, which \
-            stores the row index for each non zero element in ``data``.
+        In this case $arg1 = [$data, [$row, $col]]
+            $data, $row, $col must be given in the AI::MXNet::NDArray::array input format
+            $data - holds all the non-zero entries of the matrix in COO format.
+            $row - stores the row index for each non zero element in $data.
             - **col** (*array_like*) - An object exposing the array interface, which \
-            stores the col index for each non zero element in ``data``.
-            - **shape** (*tuple of int, optional*) - The shape of the array. The default \
-            shape is inferred from the ``row`` and ``col`` arrays.
-            - **ctx** (*Context, optional*) - Device context \
-            (default is the current default context).
-            - **dtype** (*str or numpy.dtype, optional*) - The data type of the output array. \
-            The default dtype is float32.
-
-    Parameters
-    ----------
-    arg1: tuple of int, tuple of array_like, array_like, CSRNDArray, scipy.sparse.csr_matrix, \
-    scipy.sparse.coo_matrix, tuple of int or tuple of array_like
-        The argument to help instantiate the csr matrix. See above for further details.
-    shape : tuple of int, optional
-        The shape of the csr matrix.
-    ctx: Context, optional
-        Device context (default is the current default context).
-    dtype: str or numpy.dtype, optional
-        The data type of the output array.
+            $col - stores the col index for each non zero element in $data.
 
     Returns
     -------
-    CSRNDArray
-        A `CSRNDArray` with the `csr` storage representation.
+    AI::MXNet::NDArray::CSR
+        A AI::MXNet::NDArray::CSR with the 'csr' storage representation.
 
     Example
     -------
-    >>> a = mx.nd.sparse.csr_matrix(([1, 2, 3], [1, 0, 2], [0, 1, 2, 2, 3]), shape=(4, 3))
-    >>> a.asnumpy()
-    array([[ 0.,  1.,  0.],
-           [ 2.,  0.,  0.],
-           [ 0.,  0.,  0.],
-           [ 0.,  0.,  3.]], dtype=float32)
+    >>> $a = mx->nd->sparse->csr_matrix([[1, 2, 3], [1, 0, 2], [0, 1, 2, 2, 3]], shape => [4, 3])
+    >>> $a->aspdl
+          [[ 0  1  0]
+           [ 2  0  0]
+           [ 0  0  0]
+           [ 0  0  3]]
 
     See Also
     --------
     CSRNDArray : MXNet NDArray in compressed sparse row format.
-    """
+=cut
+
+method csr_matrix(
+    $arg1,
+    Maybe[Shape]              :$shape=,
+    Maybe[AI::MXNet::Context] :$ctx=AI::MXNet::Context->current_ctx,
+    Maybe[Dtype]              :$dtype='float32'
+)
+{
     # construct a csr matrix from (M, N) or (data, indices, indptr)
-    if isinstance(arg1, tuple):
-        arg_len = len(arg1)
-        if arg_len == 2:
+    if(ref $arg1 eq 'ARRAY')
+    {
+        my $arg_len = @{ $D };
+        if($arg_len == 2)
+        {
             # construct a sparse csr matrix from
             # scipy coo matrix if input format is coo
-            if isinstance(arg1[1], tuple) and len(arg1[1]) == 2:
-                data, (row, col) = arg1
-                if isinstance(data, NDArray):
-                    data = data.asnumpy()
-                if isinstance(row, NDArray):
-                    row = row.asnumpy()
-                if isinstance(col, NDArray):
-                    col = col.asnumpy()
-                coo = spsp.coo_matrix((data, (row, col)), shape=shape)
-                _check_shape(coo.shape, shape)
-                csr = coo.tocsr()
-                return array(csr, ctx=ctx, dtype=dtype)
-            else:
+            if(ref $arg1->[1] eq 'ARRAY') and @{ $arg1->[1] } == 2)
+            {
+                my ($data, $row, $col) = map { _as_pdl($_) }($arg1->[0], @{ $arg1->[1] });
+                my $coo = __PACKAGE__->coo_matrix([$data, [$row, $col]], shape=>$shape);
+                __PACKAGE__->_check_shape($coo->shape, $shape);
+                return __PACKAGE__->array($csr, ctx => $ctx, dtype => $dtype);
+            }
+            else
+            {
                 # empty matrix with shape
-                _check_shape(arg1, shape)
-                return empty('csr', arg1, ctx=ctx, dtype=dtype)
-        elif arg_len == 3:
+                __PACKAGE__->_check_shape($arg1, $shape);
+                return __PACKAGE__->empty('csr', $arg1, ctx=>$ctx, dtype=>$dtype);
+            }
+        }
+        elsif($arg_len == 3)
+        {
             # data, indices, indptr
-            return _csr_matrix_from_definition(arg1[0], arg1[1], arg1[2], shape=shape,
-                                               ctx=ctx, dtype=dtype)
-        else:
-            raise ValueError("Unexpected length of input tuple: " + str(arg_len))
-    else:
+            return _csr_matrix_from_definition(
+                @{ $arg1 }, shape  => $shape,
+                ctx => $ctx, dtype => $dtype
+            );
+        }
+        else
+        {
+            raise ValueError("Unexpected length of input array: " . Dumper($arg1));
+        }
+    }
+    else
+    {
         # construct a csr matrix from a sparse / dense one
-        if isinstance(arg1, CSRNDArray) or (spsp and isinstance(arg1, spsp.csr.csr_matrix)):
+        if(blessed $arg1 and $arg1->isa('AI::MXNet::NDArray::CSR' or $arg1->isa('PDL::CCS::Nd')))
+        {
             # construct a csr matrix from scipy or CSRNDArray
-            _check_shape(arg1.shape, shape)
-            return array(arg1, ctx=ctx, dtype=dtype)
-        elif isinstance(arg1, RowSparseNDArray):
-            raise ValueError("Unexpected input type: RowSparseNDArray")
-        else:
+            __PACKAGE__->_check_shape($arg1->shape, $shape);
+            return __PACKAGE__->array($arg1, ctx => $ctx, dtype => $dtype);
+        }
+        elif(blessed $arg1 and $arg1->isa('AI::MXNet::NDArray::RowSparse'))
+        {
+            confess("Unexpected input type: AI::MXNet::NDArray::RowSparse");
+        }
+        else
+        {
             # construct a csr matrix from a dense one
             # prepare default ctx and dtype since mx.nd.array doesn't use default values
             # based on source_array
-            dtype = _prepare_default_dtype(arg1, dtype)
+            $dtype = __PACKAGE__->_prepare_default_dtype($arg1, $dtype);
             # create dns array with provided dtype. ctx is not passed since copy across
             # ctx requires dtype to be the same
-            dns = _array(arg1, dtype=dtype)
-            if ctx is not None and dns.context != ctx:
-                dns = dns.as_in_context(ctx)
-            _check_shape(dns.shape, shape)
-            return dns.tostype('csr')
+            my $dns = __PACKAGE__->_array($arg1, dtype=>$dtype);
+            if(defined $ctx and $dns->context ne $ctx)
+            {
+                $dns = $dns->as_in_context($ctx);
+            }
+            __PACKAGE__->_check_shape($dns->shape, $shape);
+            return $dns->tostype('csr');
+        }
+    }
+}
 
-def _csr_matrix_from_definition(data, indices, indptr, shape=None, ctx=None,
-                                dtype=None, indices_type=None, indptr_type=None):
-    """Create a `CSRNDArray` based on data, indices and indptr"""
-    storage_type = 'csr'
-    # context
-    ctx = Context.default_ctx if ctx is None else ctx
-    # types
-    dtype = _prepare_default_dtype(data, dtype)
-    indptr_type = _STORAGE_AUX_TYPES[storage_type][0] if indptr_type is None else indptr_type
-    indices_type = _STORAGE_AUX_TYPES[storage_type][1] if indices_type is None else indices_type
+# Create a AI::MXNet::NDarray::CSR based on data, indices and indptr
+method _csr_matrix_from_definition(
+    $data, $indices, $indptr,
+    Maybe[Shape] :$shape=,
+    AI::MXNet::Context :$ctx=AI::MXNet::Context->current_ctx,
+    Maybe[Dtype] :$dtype=,
+    Maybe[Dtype] :$indices_type=STORAGE_AUX_TYPES->{'csr'}[0],
+    Maybe[Dtype] :$indptr_type=STORAGE_AUX_TYPES->{'csr'}[1]
+)
+{
+    $dtype = __PACKAGE__->_prepare_default_dtype($data, $dtype);
     # prepare src array and types
-    data = _prepare_src_array(data, dtype)
-    indptr = _prepare_src_array(indptr, indptr_type)
-    indices = _prepare_src_array(indices, indices_type)
+    $data = __PACKAGE__->_prepare_src_array($data, $dtype);
+    $indptr = __PACKAGE__->_prepare_src_array($indptr, $indptr_type);
+    $indices = __PACKAGE__->_prepare_src_array($indices, $indices_type);
 
-    # TODO(junwu): Convert data, indptr, and indices to mxnet NDArrays
-    # if they are not for now. In the future, we should provide a c-api
-    # to accept np.ndarray types to copy from to result.data and aux_data
-    if not isinstance(data, NDArray):
-        data = _array(data, ctx, dtype)
-    if not isinstance(indptr, NDArray):
-        indptr = _array(indptr, ctx, indptr_type)
-    if not isinstance(indices, NDArray):
-        indices = _array(indices, ctx, indices_type)
-    if shape is None:
-        if indices.shape[0] == 0:
-            raise ValueError('invalid shape')
-        shape = (len(indptr) - 1, op.max(indices).asscalar() + 1)
+    if(not (blessed $data and $data->isa('AI::MXNet::NDArray')))
+    {
+        $data = __PACKAGE__->_array($data, $ctx, $dtype);
+    }
+    if(not (blessed $indptr and $inptr->isa('AI::MXNet::NDArray')))
+    {
+        $indptr = __PACKAGE__->_array($inptr, $ctx, $indptr_type);
+    }
+    if(not (blessed $indices and $indices->isa('AI::MXNet::NDArray')))
+    {
+        $indices = __PACKAGE__->_array($indices, $ctx, $indices_type);
+    }
+    if(not defined $shape)
+    {
+        if($indices->shape->[0] == 0)
+        {
+            confess('invalid shape');
+        }
+        $shape = [@{ $indptr } - 1, $indices->max->asscalar + 1];
+    }
     # verify shapes
-    aux_shapes = [indptr.shape, indices.shape]
-    if data.ndim != 1 or indptr.ndim != 1 or indices.ndim != 1 or \
-        indptr.shape[0] == 0 or len(shape) != 2:
-        raise ValueError('invalid shape')
-    result = CSRNDArray(_new_alloc_handle(storage_type, shape, ctx, False, dtype,
-                                          [indptr_type, indices_type], aux_shapes))
-    check_call(_LIB.MXNDArraySyncCopyFromNDArray(result.handle, data.handle, ctypes.c_int(-1)))
-    check_call(_LIB.MXNDArraySyncCopyFromNDArray(result.handle, indptr.handle, ctypes.c_int(0)))
-    check_call(_LIB.MXNDArraySyncCopyFromNDArray(result.handle, indices.handle, ctypes.c_int(1)))
-    return result
+    $aux_shapes = [$indptr->shape, $indices->shape];
+    if($data->ndim != 1 or $indptr->ndim != 1 or $indices->ndim != 1 or $indptr->shape->[0] == 0 or @{ $shape } != 2)
+    {
+        confess('invalid shape');
+    }
+    my $hdl = __PACKAGE__->_new_alloc_handle(
+        'csr', $shape, $ctx, 0, $dtype,
+        [$indptr_type, $indices_type], $aux_shapes
+    );
+    my $res = AI::MXNet::NDArray::CSR->new(handle => $hdl);
+    check_call(AI::MXNetCAPI::NDArraySyncCopyFromNDArray($result->handle, $data->handle, -1));
+    check_call(AI::MXNetCAPI::NDArraySyncCopyFromNDArray($result->handle, $indptr->handle, 0));
+    check_call(AI::MXNetCAPI::NDArraySyncCopyFromNDArray($result->handle, $indices->handle, 1));
+    return $result;
+}
 
 def row_sparse_array(arg1, shape=None, ctx=None, dtype=None):
     """Creates a `RowSparseNDArray`, a multidimensional row sparse array with a set of \
