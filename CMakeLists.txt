@@ -1,33 +1,14 @@
 cmake_minimum_required(VERSION 3.0.2)
 
-if((${CMAKE_VERSION} VERSION_GREATER "3.9.0") OR (${CMAKE_VERSION} VERSION_EQUAL "3.9.0"))
-  set(FIRST_CUDA TRUE)
-else()
-  set(FIRST_CUDA FALSE)
+if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/build/private/local_config.cmake)
+  include(${CMAKE_CURRENT_SOURCE_DIR}/build/private/local_config.cmake)
 endif()
+
 include(cmake/Utils.cmake)
 
 #Some things have order. This must be put in front alone
 mxnet_option(USE_CUDA             "Build with CUDA support"   ON)
-mxnet_option(USE_OLDCMAKECUDA           "Build with old cmake cuda" OFF)
-if(USE_CUDA)
-  add_definitions(-DMSHADOW_USE_CUDA=1)
-  IF(FIRST_CUDA AND (NOT USE_OLDCMAKECUDA))
-    set(__cuda_toolset "7.5" "8.0" "9.0")
-    set(CUDA_TOOLSET "8.0" CACHE STRING "Select CUDA Version.")
-    set_property( CACHE CUDA_TOOLSET PROPERTY STRINGS "" ${__cuda_toolset} )
-    set(CMAKE_GENERATOR_TOOLSET "cuda=${CUDA_TOOLSET},host=x64")
-    project(mxnet C CXX CUDA)
-  else()
-    project(mxnet C CXX)
-    set(FIRST_CUDA FALSE)
-  endif()
-else()
-  project(mxnet C CXX)
-  add_definitions(-DMSHADOW_USE_CUDA=0)
-endif()
-
-
+mxnet_option(USE_OLDCMAKECUDA     "Build with old cmake cuda" OFF)
 mxnet_option(USE_OPENCV           "Build with OpenCV support" ON)
 mxnet_option(USE_OPENMP           "Build with Openmp support" ON)
 mxnet_option(USE_CUDNN            "Build with cudnn support"  ON) # one could set CUDNN_ROOT for search path
@@ -50,25 +31,26 @@ mxnet_option(ENABLE_CUDA_RTC      "Build with CUDA runtime compilation support" 
 mxnet_option(INSTALL_EXAMPLES     "Install the example source files." OFF)
 mxnet_option(USE_SIGNAL_HANDLER   "Print stack traces on segfaults." OFF)
 
-
-
-if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/build/private/local_config.cmake)
-  include(${CMAKE_CURRENT_SOURCE_DIR}/build/private/local_config.cmake)
+if(USE_CUDA)
+  project(mxnet CXX CUDA)
+else()
+  project(mxnet CXX)
 endif()
+
 
 if(MSVC)
   set(SYSTEM_ARCHITECTURE x86_64)
 else()
-  EXECUTE_PROCESS( COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE SYSTEM_ARCHITECTURE)
+  execute_process(COMMAND uname -m COMMAND tr -d '\n' OUTPUT_VARIABLE SYSTEM_ARCHITECTURE)
 endif()
 
-set(CMAKE_MODULE_PATH "${PROJECT_SOURCE_DIR}/cmake/Modules;${CMAKE_MODULE_PATH}")
+set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/Modules;${CMAKE_MODULE_PATH}")
 
 SET(EXTRA_OPERATORS "" CACHE PATH "EXTRA OPERATORS PATH")
 
 if("$ENV{VERBOSE}" STREQUAL "1")
   message(STATUS " Verbose Makefile ACTIVATED")
-  set(CMAKE_VERBOISE_MAKEFILE ON)
+  set(CMAKE_VERBOSE_MAKEFILE ON)
 endif()
 
 
@@ -168,12 +150,31 @@ endif()
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/include)
 include_directories(${CMAKE_CURRENT_SOURCE_DIR}/src)
 
-if(FIRST_CUDA)
+if(USE_CUDA)
+  if((${CMAKE_VERSION} VERSION_GREATER "3.9.0") OR (${CMAKE_VERSION} VERSION_EQUAL "3.9.0"))
+    set(FIRST_CUDA TRUE)
+  else()
+    set(FIRST_CUDA FALSE)
+  endif()
+  add_definitions(-DMSHADOW_USE_CUDA=1)
+  if(FIRST_CUDA AND (NOT USE_OLDCMAKECUDA))
+    set(__cuda_toolset "7.5" "8.0" "9.0")
+    set(CUDA_TOOLSET "8.0" CACHE STRING "Select CUDA Version.")
+    set_property( CACHE CUDA_TOOLSET PROPERTY STRINGS "" ${__cuda_toolset} )
+    set(CMAKE_GENERATOR_TOOLSET "cuda=${CUDA_TOOLSET},host=x64")
+  else()
+    set(FIRST_CUDA FALSE)
+  endif()
+else()
+  add_definitions(-DMSHADOW_USE_CUDA=0)
+endif()
+
+if(USE_CUDA AND FIRST_CUDA)
   include(cmake/ChooseBlas.cmake)
   include(mshadow/cmake/Utils.cmake)
   include(cmake/FirstClassLangCuda.cmake)
 else()
-  if(EXISTS ${PROJECT_SOURCE_DIR}/mshadow/cmake)
+  if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/mshadow/cmake)
     include(mshadow/cmake/mshadow.cmake)
     include(mshadow/cmake/Utils.cmake)
     include(mshadow/cmake/Cuda.cmake)
@@ -405,7 +406,7 @@ if(USE_PLUGIN_CAFFE)
     if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/caffe)
       # Need newer FindCUDA.cmake that correctly handles -std=c++11
       cmake_minimum_required(VERSION 3.3)
-      set(CAFFE_PATH ${PROJECT_SOURCE_DIR}/caffe)
+      set(CAFFE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/caffe)
     else()
       set(CAFFE_PATH $ENV{CAFFE_PATH})
     endif()
@@ -611,13 +612,13 @@ if(AUTO_INSTALL_DIR)
   # ---[ Install Includes
   add_custom_command(TARGET mxnet POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${PROJECT_SOURCE_DIR}/include ${AUTO_INSTALL_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/include ${AUTO_INSTALL_DIR}/include
     )
 
   # ---[ Install Examples
   add_custom_command(TARGET mxnet POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-    ${PROJECT_SOURCE_DIR}/example ${AUTO_INSTALL_DIR}/example
+    ${CMAKE_CURRENT_SOURCE_DIR}/example ${AUTO_INSTALL_DIR}/example
     )
 endif()
 
