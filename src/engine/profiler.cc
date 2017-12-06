@@ -39,13 +39,27 @@
 #endif
 
 namespace mxnet {
-namespace engine {
+namespace profile {
+
+ProfileDomain ProfileOperator::domain_("operator");
 
 Profiler::Profiler()
-  : state_(kNotRunning), enable_output_(false), filename_("profile.json") {
-  this->init_time_ = NowInUsec();
+  : state_(kNotRunning)
+    , enable_output_(false)
+    , filename_("profile.json")
+    , profile_dump_count_(0) {
+  this->init_time_ = ProfileStat::NowInMicrosec();
 
+  this->cpu_num_ = 0;
+#ifdef _OPENMP
+  // OMP is going to know better than a generic stl, which might return 0
+  this->cpu_num_ = static_cast<unsigned int>(::omp_get_num_procs());
+#else
   this->cpu_num_ = std::thread::hardware_concurrency();
+#endif
+  if (!this->cpu_num_) {
+    this->cpu_num_ = 64;
+  }
 #if MXNET_USE_CUDA
   int kMaxNumGpus = 32;
   this->gpu_num_ = kMaxNumGpus;
@@ -53,7 +67,7 @@ Profiler::Profiler()
   this->gpu_num_ = 0;
 #endif
 
-  this->profile_stat = new DevStat[cpu_num_ + gpu_num_ + 1];
+  this->profile_stat = new DeviceStats[cpu_num_ + gpu_num_ + 2];
   for (unsigned int i = 0; i < cpu_num_; ++i) {
     profile_stat[i].dev_name_ = "cpu/" + std::to_string(i);
   }
@@ -62,10 +76,21 @@ Profiler::Profiler()
   }
   profile_stat[cpu_num_ + gpu_num_].dev_name_ = "cpu pinned/";
 
-  mode_ = (ProfilerMode)dmlc::GetEnv("MXNET_PROFILER_MODE", static_cast<int>(kOnlySymbolic));
+  profile_stat[cpu_num_ + gpu_num_ + 1].dev_name_ = "cpu shared/";
+
+  mode_ = dmlc::GetEnv("MXNET_PROFILER_MODE", static_cast<int>(kSymbolic));
   if (dmlc::GetEnv("MXNET_PROFILER_AUTOSTART", 0)) {
     this->state_ = ProfilerState::kRunning;
     this->enable_output_ = true;
+    // Since we want to avoid interfering with pure-VTune analylisys runs, for not set,
+    // vtune will be recording based upon whether "Start" or "STart Paused" was selected
+    common::vtune_resume();
+  }
+}
+
+Profiler::~Profiler() {
+  if (thread_group_) {
+    thread_group_.reset();
   }
 }
 
@@ -79,49 +104,34 @@ Profiler* Profiler::Get() {
 }
 
 void Profiler::SetState(ProfilerState state) {
-  std::lock_guard<std::mutex> lock{this->m_};
+  std::lock_guard<std::recursive_mutex> lock{this->m_};
   this->state_ = state;
   // once running, output will be enabled.
-  if (state == kRunning)
-      this->enable_output_ = true;
+  if (state == kRunning) {
+    this->enable_output_ = true;
+    common::vtune_resume();
+  } else {
+    common::vtune_pause();
+  }
 }
 
-void Profiler::SetConfig(ProfilerMode mode, std::string output_filename) {
-  std::lock_guard<std::mutex> lock{this->m_};
+void Profiler::SetConfig(int mode, std::string output_filename) {
+  std::lock_guard<std::recursive_mutex> lock{this->m_};
   this->mode_ = mode;
   this->filename_ = output_filename;
-}
-
-OprExecStat *Profiler::AddOprStat(int dev_type, uint32_t dev_id) {
-  std::unique_ptr<OprExecStat> opr_stat(new OprExecStat);
-  opr_stat->dev_type = dev_type;
-  opr_stat->dev_id   = dev_id;
-  opr_stat->opr_name[sizeof(opr_stat->opr_name)-1] = '\0';
-
-  int idx;
-  switch (dev_type) {
-    case Context::kCPU:
-      idx = dev_id;
-      break;
-    case Context::kGPU:
-      idx = cpu_num_ + dev_id;
-      break;
-    case Context::kCPUPinned:
-      idx = cpu_num_ + gpu_num_;
-      break;
-    default:
-      LOG(FATAL) << "Unknown dev_type: " << dev_type;
-      return NULL;
+  // Remove the output file to start
+  if (!this->filename_.empty()) {
+    ::unlink(this->filename_.c_str());
   }
-
-  DevStat& dev_stat = profile_stat[idx];
-  dev_stat.opr_exec_stats_->enqueue(opr_stat.get());
-  return opr_stat.release();
 }
 
-void Profiler::EmitPid(std::ostream *os, const std::string& name, uint32_t pid) {
+/*
+ * Docs for tracing format:
+ * https://docs.google.com/document/d/1CvAClvFfyA5R-PhYUmn5OOQtYMH4h6I0nSsKchNAySU/preview
+ */
+void Profiler::EmitPid(std::ostream *os, const std::string& name, size_t pid) {
   (*os) << "        {\n"
-        << "            \"ph\": \"M\",\n"
+        << "            \"ph\": \"" << static_cast<char>(ProfileStat::kMetadata) <<  "\",\n"
         << "            \"args\": {\n"
         << "                \"name\": \"" << name << "\"\n"
         << "            },\n"
@@ -130,98 +140,146 @@ void Profiler::EmitPid(std::ostream *os, const std::string& name, uint32_t pid) 
         << "        }";
 }
 
-void Profiler::EmitEvent(std::ostream *os, const std::string& name,
-                       const std::string& category, const std::string& ph,
-                       uint64_t ts, uint32_t pid, uint32_t tid) {
-  (*os) << "        {\n"
-        << "            \"name\": \""  << name << "\",\n"
-        << "            \"cat\": " << "\"" << category << "\",\n"
-        << "            \"ph\": \""<< ph << "\",\n"
-        << "            \"ts\": "  << ts << ",\n"
-        << "            \"pid\": " << pid << ",\n"
-        << "            \"tid\": " << tid << "\n"
-        << "        }";
-}
-
-
-void Profiler::DumpProfile() {
-  SetState(kNotRunning);
-
-  std::lock_guard<std::mutex> lock{this->m_};
+void Profiler::DumpProfile(bool peform_cleanup) {
+  std::lock_guard<std::recursive_mutex> lock{this->m_};
+  if (!enable_output_) {
+    return;
+  }
+  if (peform_cleanup) {
+    SetContinuousProfileDump(false, 1.0f);
+  }
   std::ofstream file;
-  file.open(filename_);
-
-  file << "{" << std::endl;
-  file << "    \"traceEvents\": [" << std::endl;
-
-  uint32_t dev_num = cpu_num_ + gpu_num_ + 1;
-
-  for (uint32_t i = 0; i < dev_num; ++i) {
-    const DevStat &d = profile_stat[i];
-    this->EmitPid(&file, d.dev_name_, i);
-    file << ",\n";
+  const bool first_pass = ++profile_dump_count_ == 1;
+  const bool last_pass = peform_cleanup || !append_profile_;
+  if (!first_pass && append_profile_) {
+    file.open(filename_, std::ios::app|std::ios::out);
+  } else {
+    file.open(filename_, std::ios::trunc|std::ios::out);
+  }
+  if (first_pass || !append_profile_) {
+    file << "{" << std::endl;
+    file << "    \"traceEvents\": [" << std::endl;
   }
 
-  bool first_flag = true;
-  for (uint32_t i = 0; i < dev_num; ++i) {
-    DevStat &d = profile_stat[i];
-    OprExecStat *_opr_stat;
-    while (d.opr_exec_stats_->try_dequeue(_opr_stat)) {
-      CHECK_NOTNULL(_opr_stat);
-      std::unique_ptr<OprExecStat> opr_stat(_opr_stat);  // manage lifecycle
-      uint32_t pid = i;
-      uint32_t tid = opr_stat->thread_id;
+  const size_t dev_num = DeviceCount();
 
-      if (first_flag) {
-        first_flag = false;
-      } else {
-        file << ",";
-      }
-      file << std::endl;
-      this->EmitEvent(&file, opr_stat->opr_name, "category", "B",
-                      opr_stat->opr_start_rel_micros, pid, tid);
-      file << ",\n";
-      this->EmitEvent(&file, opr_stat->opr_name, "category", "E",
-                      opr_stat->opr_end_rel_micros, pid, tid);
+  if (first_pass) {
+    for (uint32_t pid = 0; pid < dev_num; ++pid) {
+       if (pid) {
+         file << ",\n";
+       }
+      const DeviceStats &d = profile_stat[pid];
+      this->EmitPid(&file, d.dev_name_, pid);
+      process_ids_.emplace(pid);
     }
   }
 
-  file << "\n" << std::endl;
-  file << "    ]," << std::endl;
-  file << "    \"displayTimeUnit\": \"ms\"" << std::endl;
-  file << "}" << std::endl;
-
-  enable_output_ = false;
-}
-
-
-inline uint64_t NowInUsec() {
-#if defined(_MSC_VER) && _MSC_VER <= 1800
-  LARGE_INTEGER frequency, counter;
-  QueryPerformanceFrequency(&frequency);
-  QueryPerformanceCounter(&counter);
-  return counter.QuadPart * 1000000 / frequency.QuadPart;
-#else
-  return std::chrono::duration_cast<std::chrono::microseconds>(
-    std::chrono::high_resolution_clock::now().time_since_epoch()).count();
-#endif
-}
-
-void SetOprStart(OprExecStat* opr_stat) {
-  if (!opr_stat) {
-    LOG(WARNING) << "SetOpStart: nullptr";
-    return;
+  bool first_flag = !first_pass && !num_records_emitted_;
+  for (uint32_t i = 0; i < dev_num; ++i) {
+    DeviceStats &d = profile_stat[i];
+    ProfileStat *_opr_stat;
+    while (d.opr_exec_stats_->try_dequeue(_opr_stat)) {
+      CHECK_NOTNULL(_opr_stat);
+      std::unique_ptr<ProfileStat> opr_stat(_opr_stat);  // manage lifecycle
+      opr_stat->process_id_ = i;  // lie and set process id to be the device number
+      if (first_flag) {
+        first_flag = false;
+      } else {
+        file << ",\n";
+      }
+      file << std::endl;
+      opr_stat->EmitEvents(&file);
+      ++num_records_emitted_;
+    }
   }
-  opr_stat->opr_start_rel_micros = NowInUsec() - Profiler::Get()->GetInitTime();
-}
 
-void SetOprEnd(OprExecStat* opr_stat) {
-  if (!opr_stat) {
-    LOG(WARNING) << "SetOpEnd: nullptr";
-    return;
+  // Now do the non-device items
+  ProfileStat *_profile_stat;
+  while (general_stats_.opr_exec_stats_->try_dequeue(_profile_stat)) {
+    CHECK_NOTNULL(_profile_stat);
+
+    if (first_flag) {
+      first_flag = false;
+    } else {
+      file << ",";
+    }
+
+    std::unique_ptr<ProfileStat> profile_stat(_profile_stat);  // manage lifecycle
+    CHECK_NE(profile_stat->categories_.c_str()[0], '\0') << "Category must be set";
+    // Currently, category_to_pid_ is only accessed here, so it is protected by this->m_ above
+    auto iter = category_to_pid_.find(profile_stat->categories_.c_str());
+    if (iter == category_to_pid_.end()) {
+      static std::hash<std::string> hash_fn;
+      const size_t this_pid = hash_fn(profile_stat->categories_.c_str());
+      iter = category_to_pid_.emplace(std::make_pair(profile_stat->categories_.c_str(),
+                                                     this_pid)).first;
+      EmitPid(&file, profile_stat->categories_.c_str(), iter->second);
+      file << ",\n";
+    }
+    profile_stat->process_id_ = iter->second;
+    file << std::endl;
+    profile_stat->EmitEvents(&file);
+    ++num_records_emitted_;
   }
-  opr_stat->opr_end_rel_micros   = NowInUsec() - Profiler::Get()->GetInitTime();
+
+  if (last_pass) {
+    file << "\n" << std::endl;
+    file << "    ]," << std::endl;
+    file << "    \"displayTimeUnit\": \"ms\"" << std::endl;
+    file << "}" << std::endl;
+  }
+  enable_output_ = append_profile_ && !last_pass;  // If we're appending, then continue.
+                                                   // Otherwise, profiling stops.
 }
 
-}  // namespace engine
+void Profiler::SetDumpProfileAppendMode(bool append_mode) {
+  std::lock_guard<std::recursive_mutex> lock{this->m_};
+  append_profile_ = append_mode;
+}
+
+static constexpr char TIMER_THREAD_NAME[] = "DumpProfileTimer";
+
+void Profiler::SetContinuousProfileDump(bool continuous_dump, float delay_in_seconds) {
+  std::lock_guard<std::recursive_mutex> lock{this->m_};
+  if (continuous_dump) {
+    SetDumpProfileAppendMode(true);  // Continuous doesn't make sense without append mode
+    DumpProfile(false);
+    std::shared_ptr<dmlc::ManagedThread> old_thread =
+      thread_group_->thread_by_name(TIMER_THREAD_NAME);
+    if (old_thread && old_thread->is_shutdown_requested()) {
+      // This should never happen unless someone is doing something malicious
+      // At any rate, wait for its shutdown to complete
+      if (old_thread->joinable()) {
+        old_thread->join();
+      } else {
+        do {
+          std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        } while (thread_group_->thread_by_name(TIMER_THREAD_NAME));
+      }
+      old_thread.reset();
+    }
+    if (!old_thread) {
+      dmlc::CreateTimer(
+        TIMER_THREAD_NAME,
+        std::chrono::milliseconds(static_cast<size_t>(delay_in_seconds * 1000.0f)),
+        thread_group_.get(),
+        [this]() -> int {
+          if (IsEnableOutput()) {
+            DumpProfile(false);
+            return 0;  // Timer continue
+          }
+          return 1;  // Timer stop
+        });
+    }
+  } else {
+    std::shared_ptr<dmlc::ManagedThread> old_thread =
+      thread_group_->thread_by_name(TIMER_THREAD_NAME);
+    if (old_thread) {
+      // Signal it to finish asynchronously
+      old_thread->request_shutdown();
+    }
+  }
+}
+
+}  // namespace profile
 }  // namespace mxnet

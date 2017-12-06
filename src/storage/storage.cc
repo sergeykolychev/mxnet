@@ -21,17 +21,15 @@
  * Copyright (c) 2015 by Contributors
  */
 #include <mxnet/storage.h>
-#include <mshadow/tensor.h>
-#include <dmlc/logging.h>
-#include <array>
+#include "../engine/profiler.h"
 #include "./storage_manager.h"
 #include "./naive_storage_manager.h"
 #include "./pooled_storage_manager.h"
 #include "./cpu_shared_storage_manager.h"
 #include "./cpu_device_storage.h"
 #include "./pinned_memory_storage.h"
-#include "../common/cuda_utils.h"
 #include "../common/lazy_alloc_array.h"
+#include "./storage_profiler.h"
 
 namespace mxnet {
 
@@ -71,6 +69,9 @@ class StorageImpl : public Storage {
   // internal storage managers
   std::array<common::LazyAllocArray<storage::StorageManager>,
              kMaxNumberOfDevices> storage_managers_;
+#if MXNET_USE_PROFILER
+  storage::DeviceStorageProfiler profiler_;
+#endif  // MXNET_USE_PROFILER
 };  // struct Storage::Impl
 #if MXNET_USE_CUDA
 int StorageImpl::num_gpu_device = 0;
@@ -125,6 +126,9 @@ void StorageImpl::Alloc(Storage::Handle* handle) {
 
   this->ActivateDevice(handle->ctx);
   manager->Alloc(handle);
+#if MXNET_USE_PROFILER
+  profiler_.OnAlloc(*handle);
+#endif  // MXNET_USE_PROFILER
 }
 
 void StorageImpl::Free(Storage::Handle handle) {
@@ -136,6 +140,9 @@ void StorageImpl::Free(Storage::Handle handle) {
         return nullptr;
       });
   this->ActivateDevice(ctx);
+#if MXNET_USE_PROFILER
+  profiler_.OnFree(handle);
+#endif  // MXNET_USE_PROFILER
   manager->Free(handle);
 }
 
@@ -148,6 +155,9 @@ void StorageImpl::DirectFree(Storage::Handle handle) {
         return nullptr;
       });
   this->ActivateDevice(ctx);
+#if MXNET_USE_PROFILER
+  profiler_.OnFree(handle);
+#endif  // MXNET_USE_PROFILER
   manager->DirectFree(handle);
 }
 

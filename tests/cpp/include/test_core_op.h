@@ -24,6 +24,7 @@
 #include <utility>
 #include <string>
 #include "./test_op.h"
+#include "../../../src/common/vtune.h"
 #include "../../../src/imperative/imperative_utils.h"
 
 namespace mxnet {
@@ -427,7 +428,7 @@ class CoreOpExecutor : public test::op::OperatorDataInitializer<DType>
 
   inline void forward(const size_t count) {
     perf::TimingItem timeF(&OperatorExecutorTiming::GetTiming(), kForward, "Forward", count);
-    VTuneResume profile;
+    mxnet::common::VTuneResume profile;
     for (size_t i = 0; i < count; ++i) {
       Execute();
     }
@@ -436,7 +437,7 @@ class CoreOpExecutor : public test::op::OperatorDataInitializer<DType>
   inline void backward(const size_t count) {
     CHECK(HasBackward());
     perf::TimingItem timeF(&OperatorExecutorTiming::GetTiming(), kBackward, "Backward", count);
-    VTuneResume profile;
+    mxnet::common::VTuneResume profile;
     for (size_t i = 0; i < count; ++i) {
       ExecuteBackward();
     }

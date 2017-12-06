@@ -27,6 +27,7 @@
 #include <dmlc/logging.h>
 #include <dmlc/parameter.h>
 #include <dmlc/concurrency.h>
+#include <dmlc/thread_group.h>
 #include "./threaded_engine.h"
 #include "./thread_pool.h"
 #include "../common/lazy_alloc_array.h"
@@ -153,7 +154,7 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
               blk->pool.reset(new ThreadPool(
                 nthread,
                 [this, ctx, is_copy, blk]
-                  (std::shared_ptr<ThreadPool::SimpleEvent> ready_event) {
+                  (std::shared_ptr<dmlc::SimpleManualEvent> ready_event) {
                     this->GPUWorker(ctx, is_copy, blk, ready_event);
                   }, true));
               return blk;
@@ -173,7 +174,7 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
               blk->pool.reset(new ThreadPool(
                 nthread,
                 [this, ctx, is_copy, blk]
-                  (std::shared_ptr<ThreadPool::SimpleEvent> ready_event) {
+                  (std::shared_ptr<dmlc::SimpleManualEvent> ready_event) {
                     this->GPUWorker(ctx, is_copy, blk, ready_event);
                   }, true));
               return blk;
@@ -228,12 +229,12 @@ class ThreadedEnginePerDevice : public ThreadedEngine {
   inline void GPUWorker(Context ctx,
                         bool is_copy_worker,
                         ThreadWorkerBlock<type> *block,
-                        std::shared_ptr<ThreadPool::SimpleEvent> ready_event) {
+                        std::shared_ptr<dmlc::SimpleManualEvent> ready_event) {
     this->is_worker_ = true;
 #if MXNET_USE_CUDA
     mshadow::Stream<gpu> *stream;
     do {
-      ThreadPool::SimpleEvent::SetReadyOnDestroy setReady(&ready_event);
+      ThreadPool::SetReadyOnDestroy setReady(&ready_event);
       // allocate stream
       mshadow::SetDevice<gpu>(ctx.dev_id);
       if (is_copy_worker) {

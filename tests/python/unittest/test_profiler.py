@@ -16,18 +16,26 @@
 # under the License.
 
 from __future__ import print_function
+import logging
 import mxnet as mx
 from mxnet import profiler
 import time
+import os
+
+def enable_profiler(run=True):
+    profile_filename = "test_profile.json"
+    profiler.profiler_set_config(mode='all', filename=profile_filename)
+    print('profile file save to {0}'.format(profile_filename))
+    if run is True:
+      profiler.profiler_set_state('run')
+
 
 def test_profiler():
-    profile_filename = "test_profile.json"
     iter_num = 5
     begin_profiling_iter = 2
     end_profiling_iter = 4
 
-    profiler.profiler_set_config(mode='symbolic', filename=profile_filename)
-    print('profile file save to {0}'.format(profile_filename))
+    enable_profiler(False)
 
     A = mx.sym.Variable('A')
     B = mx.sym.Variable('B')
@@ -59,5 +67,151 @@ def test_profiler():
     print('          {0}ms/operator'.format(duration*1000/iter_num))
     profiler.dump_profile()
 
+
+def test_profile_create_domain():
+    enable_profiler()
+    domain = profiler.create_domain(name='PythonDomain')
+    print("Domain created: {}".format(str(domain)))
+
+
+def test_profile_task():
+    def makeParams():
+        objects = tuple('foo' for _ in range(50))
+        template = ''.join('{%d}' % i for i in range(len(objects)))
+        return template, objects
+
+    def doLog():
+        template, objects = makeParams()
+        for _ in range(100000):
+            logging.info(template.format(*objects))
+
+    logging.basicConfig()
+    enable_profiler()
+    python_domain = profiler.Domain('PythonDomain::test_profile_task')
+    task = profiler.Task(python_domain, "test_profile_task")
+    task.start()
+    start = time.time()
+    var = mx.nd.ones((1000, 500))
+    doLog()
+    var.asnumpy()
+    stop = time.time()
+    task.stop()
+    print('run took: %.3f' % (stop - start))
+
+
+def test_profile_frame():
+    def makeParams():
+        objects = tuple('foo' for _ in range(50))
+        template = ''.join('{%d}' % i for i in range(len(objects)))
+        return template, objects
+
+    def doLog():
+        template, objects = makeParams()
+        for _ in range(100000):
+            logging.info(template.format(*objects))
+
+    logging.basicConfig()
+    enable_profiler()
+    python_domain = profiler.Domain('PythonDomain::test_profile_frame')
+    frame = profiler.Frame(python_domain, "test_profile_frame")
+    frame.start()
+    start = time.time()
+    var = mx.nd.ones((1000, 500))
+    doLog()
+    var.asnumpy()
+    stop = time.time()
+    frame.stop()
+    print('run took: %.3f' % (stop - start))
+
+
+def test_profile_event(do_enable_profiler=True):
+    def makeParams():
+        objects = tuple('foo' for _ in range(50))
+        template = ''.join('{%d}' % i for i in range(len(objects)))
+        return template, objects
+
+    def doLog():
+        template, objects = makeParams()
+        for _ in range(100000):
+            logging.info(template.format(*objects))
+
+    logging.basicConfig()
+    if do_enable_profiler is True:
+      enable_profiler()
+    event = profiler.Event("test_profile_event")
+    event.start()
+    start = time.time()
+    var = mx.nd.ones((1000, 500))
+    doLog()
+    var.asnumpy()
+    stop = time.time()
+    event.stop()
+    print('run took: %.3f' % (stop - start))
+
+
+def test_profile_tune_pause_resume():
+    enable_profiler()
+    profiler.tune_pause()
+    # "test_profile_task" should *not* show up in tuning analysis
+    test_profile_task()
+    profiler.tune_resume()
+    # "test_profile_event" should show up in tuning analysis
+    test_profile_event()
+    profiler.tune_pause()
+
+
+def test_profile_counter(do_enable_profiler=True):
+    def makeParams():
+        objects = tuple('foo' for _ in range(50))
+        template = ''.join('{%d}' % i for i in range(len(objects)))
+        return template, objects
+
+    def doLog(counter):
+        template, objects = makeParams()
+        range_size = 100000
+        for i in range(range_size):
+            if i <= range_size / 2:
+                counter += 1
+            else:
+                counter -= 1
+            logging.info(template.format(*objects))
+
+    if do_enable_profiler is True:
+      enable_profiler()
+    python_domain = profiler.Domain('PythonDomain::test_profile_counter')
+    counter = profiler.Counter(python_domain, "PythonCounter::test_profile_counter")
+    counter.set_value(5)
+    counter += 1
+    start = time.time()
+    doLog(counter)
+    stop = time.time()
+    print('run took: %.3f' % (stop - start))
+
+
+def test_continuous_profile_and_instant_marker():
+    enable_profiler()
+    profiler.set_append_mode(True)
+    profiler.set_continuous_dump(True, 0.1)
+    python_domain = profiler.Domain('PythonDomain::test_continuous_profile')
+    last_file_size = 0
+    for i in range(10):
+        profiler.InstantMarker(python_domain, "StartIteration-" + str(i), 'process').signal()
+        if i > 1 and i % 10 == 0:
+            print("{}...".format(i))
+        test_profile_event(False)
+        test_profile_counter(False)
+        # File size should keep increasing
+        new_file_size = os.path.getsize("test_profile.json")
+        assert new_file_size >= last_file_size
+        last_file_size = new_file_size
+
+
 if __name__ == '__main__':
+    test_profile_create_domain()
     test_profiler()
+    test_profile_task()
+    test_profile_event()
+    test_profile_tune_pause_resume()
+    test_profile_frame()
+    test_continuous_profile_and_instant_marker()
+    test_profile_counter()

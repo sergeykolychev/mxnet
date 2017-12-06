@@ -27,6 +27,7 @@ from common.util import download_file
 import mxnet as mx
 import numpy as np
 import gzip, struct
+from mxnet import profiler
 
 def read_data(label, image):
     """
@@ -70,8 +71,10 @@ if __name__ == '__main__':
                         help='the number of classes')
     parser.add_argument('--num-examples', type=int, default=60000,
                         help='the number of training examples')
-
-    parser.add_argument('--add_stn',  action="store_true", default=False, help='Add Spatial Transformer Network Layer (lenet only)')
+    parser.add_argument('--profile', type=str, default="",
+                        help='Run profiler during training')
+    parser.add_argument('--add_stn',  action="store_true", default=False,
+                        help='Add Spatial Transformer Network Layer (lenet only)')
 
     fit.add_fit_args(parser)
     parser.set_defaults(
@@ -92,5 +95,18 @@ if __name__ == '__main__':
     net = import_module('symbols.'+args.network)
     sym = net.get_symbol(**vars(args))
 
+    profile_domain = None
+    if args.profile != "":
+      profile_filename = "mnist_profile.json"
+      profiler.profiler_set_config(mode=args.profile, filename=profile_filename)
+      profiler.set_continuous_dump(True)
+      profiler.profiler_set_state('run')
+      profile_domain = profiler.create_domain("train_mnist_main_domain")
+      profiler.set_instant_marker(profile_domain, 'Before Train')
     # train
     fit.fit(args, sym, get_mnist_iter)
+    if args.profile != "":
+      profiler.set_instant_marker(profile_domain, 'After Train')
+      profiler.profiler_set_state('stop')  # Don't really need to stop
+      profiler.dump_profile()
+

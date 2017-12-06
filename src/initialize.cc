@@ -45,12 +45,12 @@ class LibraryInitializer {
 #endif
 #if MXNET_USE_PROFILER
     // ensure profiler's constructor are called before atexit.
-    engine::Profiler::Get();
+    profile::Profiler::Get();
     // DumpProfile will be called before engine's and profiler's destructor.
     std::atexit([](){
-      engine::Profiler* profiler = engine::Profiler::Get();
+      profile::Profiler* profiler = profile::Profiler::Get();
       if (profiler->IsEnableOutput()) {
-        profiler->DumpProfile();
+        profiler->DumpProfile(true);
       }
     });
 #endif

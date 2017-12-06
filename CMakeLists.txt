@@ -100,8 +100,8 @@ set(mxnet_LINKER_LIBS "")
 
 if(USE_GPROF)
   message(STATUS "Using GPROF")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -pg")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -pg")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fno-omit-frame-pointer -g -pg")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -g -pg")
   set(CMAKE_LINK_LIBRARY_FILE_FLAG "${CMAKE_LINK_LIBRARY_FILE_FLAG} -g -pg")
 endif()
 
@@ -374,7 +374,8 @@ list(APPEND CUDA ${MSHADOW_CUDASOURCE})
 # add source group
 FILE(GLOB_RECURSE GROUP_SOURCE "src/*.cc" "nnvm/*.cc" "plugin/*.cc")
 FILE(GLOB_RECURSE GROUP_Include "src/*.h" "nnvm/*.h" "mshadow/mshadow/*.h" "plugin/*.h")
-FILE(GLOB_RECURSE GROUP_CUDA "src/*.cu" "src/*.cuh" "mshadow/mshadow/*.cuh" "plugin/*.cu" "plugin/*.cuh")
+FILE(GLOB_RECURSE GROUP_CUDA "src/*.cu" "src/*.cuh" "mshadow/mshadow/*.cuh" "plugin/*.cu"
+  "plugin/*.cuh" "3rdparty/cub/cub/*.cuh")
 assign_source_group("Source" ${GROUP_SOURCE})
 assign_source_group("Include" ${GROUP_Include})
 assign_source_group("CUDA" ${GROUP_CUDA})

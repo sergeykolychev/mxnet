@@ -89,6 +89,16 @@ typedef void *RtcHandle;
 typedef void *CudaModuleHandle;
 /*! \brief handle to rtc cuda kernel*/
 typedef void *CudaKernelHandle;
+/*! \brief handle to a VTune Domain */
+typedef void *ProfileDomainHandle;
+/*! \brief handle to a VTune Task */
+typedef void *ProfileTaskHandle;
+/*! \brief handle to a VTune Frame */
+typedef void *ProfileFrameHandle;
+/*! \brief handle to a VTune Event */
+typedef void *ProfileEventHandle;
+/*! \brief handle to a VTune Counter */
+typedef void *ProfileCounterHandle;
 
 typedef void (*ExecutorMonitorCallback)(const char*,
                                         NDArrayHandle,
@@ -227,10 +237,194 @@ MXNET_DLL int MXSetProfilerConfig(int mode, const char* filename);
  */
 MXNET_DLL int MXSetProfilerState(int state);
 
-/*! \brief Save profile and stop profiler */
+/*!
+ * \brief Save profile and stop profiler
+ * \param append true if appending to current profile file, false for truncate
+ * \return
+ */
 MXNET_DLL int MXDumpProfile();
 
-/*! \brief Set the number of OMP threads to use */
+/*!
+ * \brief Set whether to continuously write the profiling data to a file
+ * \param continuous_dump true to continuously write profiling data to a file
+ * \param delay_in_seconds Number of seconds (or fraction of seconds) to delay between writes
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXSetContinuousProfileDump(int continuous_dump, float delay_in_seconds);
+
+/*!
+ * \brief Control whether to append profile data dumps to the output file or whether to truncate
+ * \param append true to append subsequent MXDumpProfile() calls to the preexisting file
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXSetDumpProfileAppendMode(int append);
+
+/*!
+ * \brief Create profiling domain
+ * \param domain String representing the domain name to create
+ * \param out Return domain object
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileCreateDomain(const char *domain, ProfileDomainHandle *out);
+
+/*!
+ * \brief Create profile task
+ * \param name Name of the task
+ * \param domain Domain of the task
+ * \param out Output handle
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileCreateTask(ProfileDomainHandle domain,
+                                     const char *task_name,
+                                     ProfileTaskHandle *out);
+
+/*!
+ * \brief Destroy a task
+ * \param task_handle Handle to task to destroy
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileDestroyTask(ProfileTaskHandle task_handle);
+
+/*!
+ * \brief Start a named profiling task
+ * \param domain Domain that this task is attached to
+ * \param task_name Name of the task
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileTaskStart(ProfileTaskHandle task_handle);
+
+/*!
+ * \brief Stop a named profiling task
+ * \param domain Domain that this task is attached to
+ * \param task_name Name of the task
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileTaskStop(ProfileTaskHandle task_handle);
+
+/*!
+ * \brief Create profile frame
+ * \param name Name of the frame
+ * \param domain Domain of the frame
+ * \param out Output handle
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileCreateFrame(ProfileDomainHandle domain,
+                                  const char *frame_name,
+                                  ProfileFrameHandle *out);
+
+/*!
+ * \brief Destroy a frame
+ * \param frame_handle Handle to frame to destroy
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileDestroyFrame(ProfileFrameHandle frame_handle);
+
+/*!
+ * \brief Start a named profiling frame
+ * \param domain Domain that this frame is attached to
+ * \param frame_name Name of the frame
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileFrameStart(ProfileFrameHandle frame_handle);
+
+/*!
+ * \brief Stop a named profiling frame
+ * \param domain Domain that this frame is attached to
+ * \param frame_name Name of the frame
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileFrameStop(ProfileFrameHandle frame_handle);
+
+/*!
+ * \brief Create profile event
+ * \param name Name of the event
+ * \param out Output handle
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileCreateEvent(const char *event_name, ProfileEventHandle *out);
+
+/*!
+ * \brief Destroy a event
+ * \param event_handle Handle to event to destroy
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileDestroyEvent(ProfileEventHandle event_handle);
+
+/*!
+ * \brief Start a named event
+ * \param event_name Name of the event
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileEventStart(ProfileEventHandle event_handle);
+
+/*!
+* \brief Stop a named event
+* \param event_name Name of the event
+* \return 0 when success, -1 when failure happens.
+*/
+MXNET_DLL int MXProfileEventStop(ProfileEventHandle event_handle);
+
+/*!
+ * \brief Create profile counter
+ * \param name Name of the counter
+ * \param domain Domain of the counter
+ * \param out Output handle
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileCreateCounter(ProfileDomainHandle domain,
+                                     const char *counter_name,
+                                     ProfileCounterHandle *out);
+
+/*!
+ * \brief Destroy a counter
+ * \param counter_handle Handle to counter to destroy
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileDestroyCounter(ProfileCounterHandle counter_handle);
+
+/*!
+ * \brief Set a counter, given its handle
+ * \param counter_handle Handle to counter to set
+ * \param value Value to set the counter to (64-bit unsigned integer)
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileSetCounter(ProfileCounterHandle counter_handle, uint64_t value);
+
+/*!
+ * \brief Adjust a counter by the given amount, given its handle
+ * \param counter_handle Handle to counter to adjust
+ * \param value Value to adjust the counter by (64-bit signed integer)
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileAdjustCounter(ProfileCounterHandle counter_handle, int64_t value);
+
+/*!
+ * \brief Mark a single instant in time
+ * \param domain Domain of the marker
+ * \param instant_marker_name Name of the marker
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileSetInstantMarker(ProfileDomainHandle domain,
+                                        const char *instant_marker_name,
+                                        int scope);
+
+/*!
+ * \brief Pause profiler tuning collection
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileTunePause();
+
+/*!
+ * \brief Resume profiler tuning collection
+ * \return 0 when success, -1 when failure happens.
+ */
+MXNET_DLL int MXProfileTuneResume();
+
+/*!
+ * \brief Set the number of OMP threads to use
+ * \param thread_num Number of OMP threads desired
+ * \return 0 when success, -1 when failure happens.
+ */
 MXNET_DLL int MXSetNumOMPThreads(int thread_num);
 
 /*!

@@ -130,7 +130,7 @@ class OperatorRunner {
    * \param dim Data dimensions
    * \param count Number of times to run in each direction
    */
-  std::unordered_map<int, perf::TimingInstrument::Info>
+  std::unordered_map<int, perf::Info>
   TimingTest(const std::string& label,
              const bool isGPU,
              const bool stochastic,
@@ -143,7 +143,7 @@ class OperatorRunner {
       count = 1;
     }
 
-    test::perf::TimingInstrument timing;
+    mxnet::perf::TimingInstrument timing;
 
     std::stringstream ss;
     ss << "Timing: " << total_iterations_ << " iterations of " << count << " calls";

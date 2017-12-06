@@ -77,7 +77,7 @@ struct OprBlock : public common::ObjectPoolAllocatable<OprBlock> {
   /*! \brief indicate whether to profile this operator */
   bool profiling{false};
   /*! \brief operator execution statistics */
-  OprExecStat *opr_stat;
+  std::unique_ptr<profile::ProfileOperator> opr_profile;
   // define possible debug information
   DEFINE_ENGINE_DEBUG_INFO(OprBlock);
   /*!
@@ -326,14 +326,8 @@ class ThreadedEngine : public Engine {
 #if MXNET_USE_PROFILER
     if (opr_block->profiling && threaded_opr->opr_name) {
       const Context& ctx = opr_block->ctx;
-      opr_block->opr_stat = Profiler::Get()->AddOprStat(ctx.dev_type, ctx.dev_id);
-      uint64_t id = std::hash<std::thread::id>()(std::this_thread::get_id());
-      opr_block->opr_stat->thread_id = id;
-      strncpy(opr_block->opr_stat->opr_name,
-        threaded_opr->opr_name,
-        sizeof(opr_block->opr_stat->opr_name) - 1);
-      // record operator start timestamp
-      SetOprStart(opr_block->opr_stat);
+      opr_block->opr_profile.reset(new profile::ProfileOperator(threaded_opr->opr_name));
+      opr_block->opr_profile->start(ctx.dev_type, ctx.dev_id);
     }
 #endif
     CallbackOnComplete callback = this->CreateCallback(

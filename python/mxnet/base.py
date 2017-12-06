@@ -128,6 +128,11 @@ RecordIOHandle = ctypes.c_void_p
 RtcHandle = ctypes.c_void_p
 CudaModuleHandle = ctypes.c_void_p
 CudaKernelHandle = ctypes.c_void_p
+ProfileDomainHandle = ctypes.c_void_p
+ProfileTaskHandle = ctypes.c_void_p
+ProfileFrameHandle = ctypes.c_void_p
+ProfileEventHandle = ctypes.c_void_p
+ProfileCounterHandle = ctypes.c_void_p
 #----------------------------
 # helper function definition
 #----------------------------

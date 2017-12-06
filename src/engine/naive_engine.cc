@@ -44,7 +44,7 @@ class NaiveEngine final : public Engine {
     /*! \brief indicate whether to profile this operator */
     bool profiling{false};
     /*! \brief operator execution statistics */
-    OprExecStat *opr_stat;
+    std::unique_ptr<profile::ProfileOperator> opr_profile;
   };
 
   NaiveEngine() {
@@ -89,23 +89,18 @@ class NaiveEngine final : public Engine {
   }
 
   void Push(OprHandle op, Context exec_ctx, int priority = 0, bool profiling = false) override {
-    Profiler *profiler = Profiler::Get();
+    profile::Profiler *profiler = profile::Profiler::Get();
     NaiveOpr *opr = op->Cast<NaiveOpr>();
-    opr->profiling = profiling && (profiler->GetMode() == Profiler::kOnlySymbolic);
+    opr->profiling = profiling && (profiler->GetMode() & profile::Profiler::kSymbolic);
     this->PushAsync([&](RunContext ctx, CallbackOnComplete on_complete) {
 #if MXNET_USE_PROFILER
         if (opr->profiling) {
-          opr->opr_stat = Profiler::Get()->AddOprStat(exec_ctx.dev_type, exec_ctx.dev_id);
-          uint64_t id = std::hash<std::thread::id>()(std::this_thread::get_id());
-          opr->opr_stat->thread_id = id;
-          strncpy(opr->opr_stat->opr_name,
-            opr->opr_name,
-            sizeof(opr->opr_stat->opr_name) - 1);
-          SetOprStart(opr->opr_stat);
+          opr->opr_profile.reset(new profile::ProfileOperator(opr->opr_name));
+          opr->opr_profile->start(exec_ctx.dev_type, exec_ctx.dev_id);
         }
         opr->fn(ctx, on_complete);
         if (opr->profiling) {
-          SetOprEnd(opr->opr_stat);
+          opr->opr_profile->stop();
         }
 #else
         opr->fn(ctx, on_complete);
@@ -130,22 +125,17 @@ class NaiveEngine final : public Engine {
         NaiveEngine::OnComplete, nullptr);
     this->req_completed_ = false;
 #if MXNET_USE_PROFILER
-    Profiler *profiler = Profiler::Get();
+    profile::Profiler *profiler = profile::Profiler::Get();
     NaiveOpr *opr = nullptr;
-    bool profiling = (profiler->GetState() == Profiler::kRunning) &&
-                   (profiler->GetMode() == Profiler::kAllOperator) &&
+    bool profiling = (profiler->GetState() == profile::Profiler::kRunning) &&
+                   (profiler->GetMode() & profile::Profiler::kImperative) &&
                    opr_name;
     if (profiling) {
       opr = NewOperator(exec_fun, const_vars, mutable_vars,
                         prop, opr_name)->Cast<NaiveOpr>();
       opr->profiling = profiling;
-      opr->opr_stat = Profiler::Get()->AddOprStat(exec_ctx.dev_type, exec_ctx.dev_id);
-      uint64_t id = std::hash<std::thread::id>()(std::this_thread::get_id());
-      opr->opr_stat->thread_id = id;
-      strncpy(opr->opr_stat->opr_name,
-              opr->opr_name,
-              sizeof(opr->opr_stat->opr_name) - 1);
-      SetOprStart(opr->opr_stat);
+      opr->opr_profile.reset(new profile::ProfileOperator(opr->opr_name));
+      opr->opr_profile->start(exec_ctx.dev_type, exec_ctx.dev_id);
     }
 #endif
     if (exec_ctx.dev_mask() == gpu::kDevMask) {
@@ -169,7 +159,7 @@ class NaiveEngine final : public Engine {
         << "NaiveEngine only support synchronize Push so far";
 #if MXNET_USE_PROFILER
     if (profiling) {
-      SetOprEnd(opr->opr_stat);
+      opr->opr_profile->stop();
     }
 #endif
   }
