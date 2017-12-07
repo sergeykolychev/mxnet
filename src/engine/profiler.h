@@ -470,7 +470,7 @@ struct ProfileDomain {
    * \brief Constructor
    * \param name Name of the domain
    */
-  explicit ProfileDomain(const char *name)
+  explicit ProfileDomain(const char *name) noexcept
     : name_(name) {
     CHECK_NOTNULL(name);
     CHECK_NE(name[0], '\0');
@@ -498,7 +498,7 @@ struct ProfileCounter {
    * \param name Counter name
    * \param domain Counter domain
    */
-  ProfileCounter(const char *name, ProfileDomain *domain)
+  ProfileCounter(const char *name, ProfileDomain *domain) noexcept
     : name_(name)
       , domain_(domain)
       , value_(0) {

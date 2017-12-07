@@ -31,27 +31,12 @@ def profiler_set_config(mode='symbolic', filename='profile.json'):
     ----------
     mode : string, optional
         Indicates whether to enable the profiler, can
-        be 'symbolic', or 'all'. Defaults to `symbolic`.
+        be 'symbolic', 'imperative', 'api, 'memory', 'all_ops', or 'all'.
+        Defaults to `symbolic`.
     filename : string, optional
         The name of output trace file. Defaults to 'profile.json'.
     """
-    mode2int = {'symbolic': 1,
-                'imperative': 2,
-                'api': 4,
-                'memory': 8,
-                # Combined alias items
-                'all_ops': 3,
-                'all': 15
-                }
-    mode_flag = 0
-    if isinstance(mode, list):
-      for i in mode:
-        mode_flag |= mode2int[i]
-    elif isinstance(mode, str):
-        mode_flag |= mode2int[mode]
-    elif isinstance(mode, (int, long)):
-      mode_flag = mode
-    check_call(_LIB.MXSetProfilerConfig(ctypes.c_int(mode_flag), c_str(filename)))
+    check_call(_LIB.MXSetProfilerConfig(c_str(mode), c_str(filename)))
 
 def profiler_set_state(state='stop'):
     """Set up the profiler state to record operator.
@@ -164,9 +149,7 @@ def set_continuous_dump(continuous_dump=True, delay_in_seconds=1.0):
   check_call(_LIB.MXSetContinuousProfileDump(ctypes.c_int(cd), ctypes.c_float(ds)))
 
 def set_instant_marker(domain_handle, name, scope='process'):
-    marker_scope2int = { 'global': 1, 'process': 2, 'thread': 3, 'task': 4, 'marker': 5 }
-    scope_int = marker_scope2int[scope]
-    check_call(_LIB.MXProfileSetInstantMarker(domain_handle, c_str(name), scope_int))
+    check_call(_LIB.MXProfileSetInstantMarker(domain_handle, c_str(name), c_str(scope)))
 
 
 class Domain:

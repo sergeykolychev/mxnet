@@ -195,7 +195,7 @@ def test_continuous_profile_and_instant_marker():
     python_domain = profiler.Domain('PythonDomain::test_continuous_profile')
     last_file_size = 0
     for i in range(10):
-        profiler.InstantMarker(python_domain, "StartIteration-" + str(i), 'process').signal()
+        profiler.InstantMarker(python_domain, "StartIteration-" + str(i)).signal('process')
         if i > 1 and i % 10 == 0:
             print("{}...".format(i))
         test_profile_event(False)

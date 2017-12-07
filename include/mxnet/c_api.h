@@ -221,13 +221,11 @@ MXNET_DLL int MXRandomSeed(int seed);
 MXNET_DLL int MXNotifyShutdown();
 /*!
  * \brief Set up configuration of profiler
- * \param mode indicate the working mode of profiler,
- *  record anly symbolic operator when mode == 0,
- *  record all operator when mode == 1
+ * \param mode indicate the working mode of profiler
  * \param filename where to save trace file
  * \return 0 when success, -1 when failure happens.
  */
-MXNET_DLL int MXSetProfilerConfig(int mode, const char* filename);
+MXNET_DLL int MXSetProfilerConfig(const char *mode, const char* filename);
 /*!
  * \brief Set up state of profiler
  * \param state indicate the working state of profiler,
@@ -402,11 +400,12 @@ MXNET_DLL int MXProfileAdjustCounter(ProfileCounterHandle counter_handle, int64_
  * \brief Mark a single instant in time
  * \param domain Domain of the marker
  * \param instant_marker_name Name of the marker
+ * \param scope Scope of marker ('global', 'process', 'thread', 'task', 'marker')
  * \return 0 when success, -1 when failure happens.
  */
 MXNET_DLL int MXProfileSetInstantMarker(ProfileDomainHandle domain,
                                         const char *instant_marker_name,
-                                        int scope);
+                                        const char *scope);
 
 /*!
  * \brief Pause profiler tuning collection

@@ -198,11 +198,46 @@ static void warn_not_built_with_profiler_enabled() {
 }
 #endif  // MXNET_USE_PROFILER
 
-int MXSetProfilerConfig(int mode, const char* filename) {
+struct ProfileModeParam : public dmlc::Parameter<ProfileModeParam> {
+  int mode;
+  DMLC_DECLARE_PARAMETER(ProfileModeParam) {
+    DMLC_DECLARE_FIELD(mode).set_default(profile::Profiler::kSymbolic)
+      .add_enum("symbolic", profile::Profiler::kSymbolic)
+      .add_enum("imperative", profile::Profiler::kImperative)
+      .add_enum("api", profile::Profiler::kAPI)
+      .add_enum("memory", profile::Profiler::kMemory)
+      .add_enum("all_ops", profile::Profiler::kSymbolic|profile::Profiler::kImperative)
+      .add_enum("all", profile::Profiler::kSymbolic|profile::Profiler::kImperative
+                       |profile::Profiler::kAPI|profile::Profiler::kMemory)
+      .describe("Profile mode.");
+  }
+};
+
+DMLC_REGISTER_PARAMETER(ProfileModeParam);
+
+struct ProfileInstantScopeParam : public dmlc::Parameter<ProfileInstantScopeParam> {
+  int scope;
+  DMLC_DECLARE_PARAMETER(ProfileInstantScopeParam) {
+    DMLC_DECLARE_FIELD(scope).set_default(profile::ProfileInstantMarker::kProcess)
+      .add_enum("global", profile::ProfileInstantMarker::kGlobal)
+      .add_enum("process", profile::ProfileInstantMarker::kProcess)
+      .add_enum("thread", profile::ProfileInstantMarker::kThread)
+      .add_enum("task", profile::ProfileInstantMarker::kTask)
+      .add_enum("marker", profile::ProfileInstantMarker::kMarker)
+      .describe("Profile Instant-Marker scope.");
+  }
+};
+
+DMLC_REGISTER_PARAMETER(ProfileInstantScopeParam);
+
+int MXSetProfilerConfig(const char *mode, const char* filename) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
-    profile::Profiler::Get()->SetConfig(profile::Profiler::ProfilerMode(mode),
+    ProfileModeParam param;
+    std::vector<std::pair<std::string, std::string>> kwargs = {{ "mode", mode }};
+    param.Init(kwargs);
+    profile::Profiler::Get()->SetConfig(profile::Profiler::ProfilerMode(param.mode),
                                         std::string(filename));
 #else
     warn_not_built_with_profiler_enabled();
@@ -566,14 +601,17 @@ int MXProfileAdjustCounter(ProfileCounterHandle counter_handle, int64_t by_value
 
 int MXProfileSetInstantMarker(ProfileDomainHandle domain,
                               const char *instant_marker_name,
-                              int scope) {
+                              const char *scope) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
+    ProfileInstantScopeParam param;
+    std::vector<std::pair<std::string, std::string>> kwargs = {{ "scope", scope }};
+    param.Init(kwargs);
     profile::ProfileInstantMarker marker(instant_marker_name,
                                          static_cast<profile::ProfileDomain *>(domain),
                                          static_cast<profile::ProfileInstantMarker::MarkerScope>(
-                                           scope));
+                                           param.scope));
     marker.signal();
 #else
     warn_not_built_with_profiler_enabled();
