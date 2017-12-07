@@ -109,9 +109,9 @@ void Profiler::SetState(ProfilerState state) {
   // once running, output will be enabled.
   if (state == kRunning) {
     this->enable_output_ = true;
-    common::vtune_resume();
+    set_paused(false);
   } else {
-    common::vtune_pause();
+    set_paused(true);
   }
 }
 

@@ -27,8 +27,10 @@
 
 #include <string.h>
 #include <dmlc/logging.h>
+#include <dmlc/thread_group.h>
 #include <mshadow/base.h>
 #include <atomic>
+#include <unordered_map>
 
 #if MXNET_USE_VTUNE
 #include <ittnotify.h>
@@ -89,6 +91,70 @@ class VTuneDomain {
 };
 
 /*!
+ * \brief VTune object registry to hold create-once object by name
+ * \tparam VTuneObject
+ * \note Some objects are expensive to create, such as VTuneEvent, so it's more desirable to
+ *       do the mutex lock and reuse
+ */
+template<typename VTuneObject>
+class VTuneRegistry {
+ public:
+  /*!
+   * \brief Retrieve (and create if needed) an object of type 'VTuneObject'
+   * \tparam Args Types of arguments to pass to constructor after 'name'
+   * \param name Name of the object
+   * \param args Arguments to pass to constructor after 'name'
+   * \return Pointer to the cached or new VTuneObject
+   */
+  template<typename ...Args>
+  inline VTuneObject *get(const char *name, Args... args) {
+    dmlc::ReadLock read_lock(m_);
+    auto iter = registry_.find(name);
+    if(iter == registry_.end()) {
+      dmlc::WriteLock write_lock(m_);
+      iter = registry_.emplace(name, std::unique_ptr<VTuneObject>(
+        new VTuneObject(name, args...))).first;
+    }
+    return iter->second.get();
+  }
+
+  /*!
+   * \brief Retrieve (and create if needed) an object of type 'VTuneObject'
+   * \tparam Args Types of arguments to pass to constructor after 'name'
+   * \param name Name of the object
+   * \param domain Domain of the object (used to create name key)
+   * \param args Arguments to pass to constructor after 'domain'
+   * \return Pointer to the cached or new VTuneObject
+   */
+  template<typename ...Args>
+  inline VTuneObject *get(const char *name, const VTuneDomain *domain, Args... args) {
+    dmlc::ReadLock read_lock(m_);
+    auto iter = registry_.find(name);
+    if(iter == registry_.end()) {
+      dmlc::WriteLock write_lock(m_);
+      std::unique_ptr<VTuneObject> ev(new VTuneObject(name, domain, args...));
+      iter = registry_.emplace(name, std::unique_ptr<VTuneObject>(
+        new VTuneObject(make_key(name, domain), args...))).first;
+    }
+    return iter->second.get();
+  }
+
+ private:
+  /*!
+   * \brief Make map lookup key given the name and domain of an object
+   * \param name Name of the object
+   * \param domain Domain of the object
+   * \return String key created form the name and domain names
+   */
+  static inline std::string make_key(const char *name, const VTuneDomain *domain) {
+    return std::string(domain->name()) + "::" + std::string(name);
+  }
+
+  dmlc::SharedMutex m_;
+  std::unordered_map<std::string, std::unique_ptr<VTuneObject>> registry_;
+};
+
+/*!
  * \brief VTune Event (per-thread)
  * \note https://software.intel.com/en-us/vtune-amplifier-help-event-api
  * \remark This class has no dependency on the mxnet profiler
@@ -99,6 +165,9 @@ class VTuneEvent {
   : itt_event_(__itt_event_create(name, strlen(name))) { }
   inline void start() { __itt_event_start(itt_event_); }
   inline void stop()  { __itt_event_end(itt_event_); }
+
+  static VTuneRegistry<VTuneEvent> registry_;
+
  private:
   __itt_event itt_event_;
 };

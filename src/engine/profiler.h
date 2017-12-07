@@ -250,6 +250,7 @@ struct DeviceStats {
 /*!
  * \brief profiler that records the operation execution information
  *        and saves the profile statistics.
+ * \note Profiler class doesn't know anything about VTune
  */
 class Profiler {
  public:
@@ -712,7 +713,7 @@ struct ProfileEvent {
   explicit inline ProfileEvent(const char *name)
     : name_(name)
       , categories_("event") {
-    VTUNE_ONLY_CODE(vtune_event_.reset(new common::VTuneEvent(name)));
+    VTUNE_ONLY_CODE(vtune_event_ = common::VTuneEvent::registry_.get(name));
   }
 
   /*!
@@ -766,7 +767,7 @@ struct ProfileEvent {
   /*! \brief Event categories (comma-delimited) */
   profile_stat_string categories_;
   /*! \brief VTune event object */
-  VTUNE_ONLY_CODE(std::unique_ptr<common::VTuneEvent> vtune_event_);
+  VTUNE_ONLY_CODE(common::VTuneEvent *vtune_event_);
 
  protected:
   /*! \brief Start time of the event */
