@@ -125,7 +125,11 @@ endif ()
 #   mshadow_select_nvcc_arch_flags(out_variable)
 function(mshadow_select_nvcc_arch_flags out_variable)
 
+<<<<<<< 59deb46eec3250596fff33905080e88ee70f198e
   set(CUDA_ARCH_LIST "Auto" CACHE STRING "Select target NVIDIA GPU achitecture.")
+=======
+  set(CUDA_ARCH_LIST "Common" CACHE STRING "Select target NVIDIA GPU achitecture.")
+>>>>>>> C++14 optional for first-class cmake CUDA, trivial const
   set_property( CACHE CUDA_ARCH_LIST PROPERTY STRINGS "" "All" "Common" ${CUDA_KNOWN_GPU_ARCHITECTURES} )
   mark_as_advanced(CUDA_ARCH_NAME)
 
