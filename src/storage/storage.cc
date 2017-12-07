@@ -140,10 +140,10 @@ void StorageImpl::Free(Storage::Handle handle) {
         return nullptr;
       });
   this->ActivateDevice(ctx);
+  manager->Free(handle);
 #if MXNET_USE_PROFILER
   profiler_.OnFree(handle);
 #endif  // MXNET_USE_PROFILER
-  manager->Free(handle);
 }
 
 void StorageImpl::DirectFree(Storage::Handle handle) {
@@ -155,10 +155,10 @@ void StorageImpl::DirectFree(Storage::Handle handle) {
         return nullptr;
       });
   this->ActivateDevice(ctx);
+  manager->DirectFree(handle);
 #if MXNET_USE_PROFILER
   profiler_.OnFree(handle);
 #endif  // MXNET_USE_PROFILER
-  manager->DirectFree(handle);
 }
 
 void StorageImpl::SharedIncrementRefCount(Storage::Handle handle) {
