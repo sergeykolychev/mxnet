@@ -530,7 +530,7 @@ struct ProfileCounter {
   }
   /*! \brief operator: object += v */
   inline uint64_t operator +=(int64_t v) {
-    if(v >= 0) {
+    if (v >= 0) {
       return IncrementValue(static_cast<uint64_t>(v));
     } else {
       v = -v;
@@ -540,7 +540,7 @@ struct ProfileCounter {
   /*! \brief operator: object -= v */
   inline uint64_t operator -=(int64_t v) {
     CHECK_GE(value_, v);
-    if(v >= 0) {
+    if (v >= 0) {
       return DecrementValue(static_cast<uint64_t>(v));
     } else {
       v = -v;
@@ -913,7 +913,7 @@ struct ProfileInstantMarker {
   }
 
   static char vtune_scope_to_chrome_scope(const MarkerScope scope) {
-    switch(scope) {
+    switch (scope) {
       case kThread:
         return 't';
       case kGlobal:
