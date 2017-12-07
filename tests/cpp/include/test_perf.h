@@ -24,8 +24,8 @@
  * \author Chris Olivier
 */
 
-#ifndef MXNET_ENGINE_PERF_H_
-#define MXNET_ENGINE_PERF_H_
+#ifndef TEST_PERF_H_
+#define TEST_PERF_H_
 
 #ifndef _WIN32
 #include <sys/time.h>
@@ -387,4 +387,4 @@ class TimingItem {
 }  // namespace perf
 }  // namespace mxnet
 
-#endif  // MXNET_ENGINE_PERF_H_
+#endif  // TEST_PERF_H_
