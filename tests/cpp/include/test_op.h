@@ -140,11 +140,11 @@ class OperatorDataInitializer {
 
 class OperatorExecutorTiming {
  public:
-  inline mxnet::perf::TimingInstrument& GetTiming() { return timing_; }
+  inline mxnet::test::perf::TimingInstrument& GetTiming() { return timing_; }
 
  private:
   /*! Timing instrumentation */
-  mxnet::perf::TimingInstrument timing_;
+  mxnet::test::perf::TimingInstrument timing_;
 };
 
 /*! \brief Top-level operator test state info structure */

@@ -72,7 +72,7 @@ class TuningTester {
 
  private:
   using ShapesToPerfTimingMap =
-  std::map<shape_vect, mxnet::perf::timing_map_t, test::less_shapevect>;
+  std::map<shape_vect, mxnet::test::perf::timing_map_t, test::less_shapevect>;
 
   /*!
    * \brief Run timing test on various data shapes and sizes
@@ -100,7 +100,7 @@ class TuningTester {
     // Do the performance runs
     const char *pu = isGPU ? "GPU" : "CPU";
     for (const std::vector<TShape> &this_run_shapes : shapes) {
-      mxnet::perf::timing_map_t tmap = runner.TimingTest(std::string(op_name) + " Operator " + pu,
+      mxnet::test::perf::timing_map_t tmap = runner.TimingTest(std::string(op_name) + " Operator " + pu,
                                                         isGPU, false, kwargs,
                                                         0, calls_per_iteration_,
                                                         this_run_shapes);
@@ -112,7 +112,7 @@ class TuningTester {
 
   using tuned_timing_t = std::map<
     shape_vect,
-    std::map<::mxnet::op::tune::TuningMode, mxnet::perf::timing_map_t>, test::less_shapevect>;
+    std::map<::mxnet::op::tune::TuningMode, mxnet::test::perf::timing_map_t>, test::less_shapevect>;
 
   using modesort_t = std::multimap<double, ::mxnet::op::tune::TuningMode>;
 
@@ -206,9 +206,9 @@ class TuningTester {
       modesort_t mode_sort;
       for (const auto &j : mode2timing) {
         const ::mxnet::op::tune::TuningMode mode = j.first;
-        const mxnet::perf::timing_map_t &tm = j.second;
+        const mxnet::test::perf::timing_map_t &tm = j.second;
         if (tm.find(direction) != tm.end()) {
-          const mxnet::perf::Info &info = tm.find(direction)->second;
+          const mxnet::test::perf::Info &info = tm.find(direction)->second;
           double duration = info.TimeEach();
           mode_sort.insert({duration, mode});
           if (test::csv) {
@@ -277,7 +277,7 @@ class TuningTester {
                                                                          backward_op_name);
         for (const auto &item : shapes2perfmap) {
           const shape_vect &shapes = item.first;
-          const mxnet::perf::timing_map_t &tm = item.second;
+          const mxnet::test::perf::timing_map_t &tm = item.second;
           timing_[shapes][mode] = tm;
         }
       }
