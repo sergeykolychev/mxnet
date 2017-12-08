@@ -518,6 +518,7 @@ int MXProfileTunePause() {
   API_BEGIN();
 #if MXNET_USE_PROFILER
     common::vtune_pause();
+    profile::Profiler::Get()->set_paused(true);
 #else
     warn_not_built_with_profiler_enabled();
 #endif
@@ -528,6 +529,7 @@ int MXProfileTuneResume() {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
+    profile::Profiler::Get()->set_paused(false);
     common::vtune_resume();
 #else
     warn_not_built_with_profiler_enabled();
