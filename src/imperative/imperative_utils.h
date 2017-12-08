@@ -464,7 +464,7 @@ inline void PushOperator(const OpStatePtr& state,
                                &pre_temp_src, &pre_temp_dst, &post_temp_src, &post_temp_dst,
                                &in_temp_idx_map, mutate_idx);
         // setup contexts
-        bool is_gpu = rctx.get_ctx().dev_mask() == gpu::kDevMask;
+        const bool is_gpu = rctx.get_ctx().dev_mask() == gpu::kDevMask;
         // pre-fcompute fallback
         CastNonDefaultStorage(pre_temp_src, pre_temp_dst, opctx, is_gpu);
         fcompute(state, opctx, input_blobs, req, output_blobs);
