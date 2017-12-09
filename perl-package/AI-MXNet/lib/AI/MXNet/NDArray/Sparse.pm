@@ -54,8 +54,8 @@ method _new_alloc_handle(
     my $aux_type_ids = [map { DTYPE_STR_TO_MX->{$_} } @$aux_types];
     $aux_shapes //= [map { [0] } @$aux_types];
     my $aux_shape_lens = [map { scalar(@$_) } @$aux_shapes];
-    @$aux_shapes = map { @$_} @$aux_shapes;
-    my $num_aux = mx_uint(len(aux_types))
+    @$aux_shapes = map { @$_ } @$aux_shapes;
+    my $num_aux = @{ $aux_types };
     my $handle = check_call(
         AI::MXNetCAPI::NDArrayCreateSparseEx(
             STORAGE_TYPE_STR_TO_ID->{$stype},
@@ -101,13 +101,14 @@ method _aux_type(Int $i)
         check_call(
             AI::MXNetCAPI::NDArrayGetAuxType(
                 $self->handle, $i
+            )
         )
     }
 }
 
 method _num_aux()
 {
-    return scalar(@{ STORAGE_AUX_TYPES->{ $self->stype });
+    return scalar(@{ STORAGE_AUX_TYPES->{ $self->stype } });
 }
 
 method _aux_types()
@@ -184,8 +185,9 @@ method copyto(AI::MXNet::NDArray|AI::MXNet::Context $other)
         my $hret = __PACKAGE__->_ndarray_cls(
             __PACKAGE__->_new_alloc_handle(
                 $self->stype, $self->shape, $other, 1, $self->dtype, $self->_aux_types
-                                                  True, self.dtype, self._aux_types))
-            return _internal._copyto(self, out=hret)
+            )
+        );
+        return __PACKAGE__->_copyto($self, out=>$hret)
     }
 }
 
@@ -397,7 +399,7 @@ method set(CSRSetInput $other)
     }
     else
     {
-        my $tmp = _array($value);
+        my $tmp = __PACKAGE__->_array($other);
         $tmp->copyto($self);
     }
 }
@@ -642,7 +644,7 @@ method set(RowSparseSetInput $other)
     }
     else
     {
-        my $tmp = _array($value);
+        my $tmp = _array($other);
         $tmp->copyto($self);
     }
 }
@@ -784,7 +786,7 @@ method _prepare_default_dtype($src_array, $dtype)
 use Data::Dumper;
 method _check_shape($s1, $s2)
 {
-    if ($s1 and $s2 and and Dumper($s1) ne Dumper($s2))
+    if ($s1 and $s2 and Dumper($s1) ne Dumper($s2))
     {
         confess("Shape mismatch detected. " . Dumper($s1) . " v.s. " . Dumper($s2));
     }
@@ -873,12 +875,12 @@ method csr_matrix(
         {
             # construct a sparse csr matrix from
             # scipy coo matrix if input format is coo
-            if(ref $arg1->[1] eq 'ARRAY') and @{ $arg1->[1] } == 2)
+            if(ref $arg1->[1] eq 'ARRAY' and @{ $arg1->[1] } == 2)
             {
                 my ($data, $row, $col) = map { _as_pdl($_) }($arg1->[0], @{ $arg1->[1] });
                 my $coo = __PACKAGE__->coo_matrix([$data, [$row, $col]], shape=>$shape);
                 __PACKAGE__->_check_shape($coo->shape, $shape);
-                return __PACKAGE__->array($csr, ctx => $ctx, dtype => $dtype);
+                return __PACKAGE__->array($coo, ctx => $ctx, dtype => $dtype);
             }
             else
             {
@@ -909,7 +911,7 @@ method csr_matrix(
             __PACKAGE__->_check_shape($arg1->shape, $shape);
             return __PACKAGE__->array($arg1, ctx => $ctx, dtype => $dtype);
         }
-        elif(blessed $arg1 and $arg1->isa('AI::MXNet::NDArray::RowSparse'))
+        elsif(blessed $arg1 and $arg1->isa('AI::MXNet::NDArray::RowSparse'))
         {
             confess("Unexpected input type: AI::MXNet::NDArray::RowSparse");
         }
@@ -952,9 +954,9 @@ method _csr_matrix_from_definition(
     {
         $data = __PACKAGE__->_array($data, $ctx, $dtype);
     }
-    if(not (blessed $indptr and $inptr->isa('AI::MXNet::NDArray')))
+    if(not (blessed $indptr and $indptr->isa('AI::MXNet::NDArray')))
     {
-        $indptr = __PACKAGE__->_array($inptr, $ctx, $indptr_type);
+        $indptr = __PACKAGE__->_array($indptr, $ctx, $indptr_type);
     }
     if(not (blessed $indices and $indices->isa('AI::MXNet::NDArray')))
     {
@@ -969,7 +971,7 @@ method _csr_matrix_from_definition(
         $shape = [@{ $indptr } - 1, $indices->max->asscalar + 1];
     }
     # verify shapes
-    $aux_shapes = [$indptr->shape, $indices->shape];
+    my $aux_shapes = [$indptr->shape, $indices->shape];
     if($data->ndim != 1 or $indptr->ndim != 1 or $indices->ndim != 1 or $indptr->shape->[0] == 0 or @{ $shape } != 2)
     {
         confess('invalid shape');
@@ -978,7 +980,7 @@ method _csr_matrix_from_definition(
         'csr', $shape, $ctx, 0, $dtype,
         [$indptr_type, $indices_type], $aux_shapes
     );
-    my $res = AI::MXNet::NDArray::CSR->new(handle => $hdl);
+    my $result = AI::MXNet::NDArray::CSR->new(handle => $hdl);
     check_call(AI::MXNetCAPI::NDArraySyncCopyFromNDArray($result->handle, $data->handle, -1));
     check_call(AI::MXNetCAPI::NDArraySyncCopyFromNDArray($result->handle, $indptr->handle, 0));
     check_call(AI::MXNetCAPI::NDArraySyncCopyFromNDArray($result->handle, $indices->handle, 1));
@@ -1041,12 +1043,12 @@ method row_sparse_array(
     # construct a row sparse array from (D0, D1 ..) or (data, indices)
     if(ref $arg1 eq 'ARRAY')
     {
-        my $arg_len = @{ arg1 };
+        my $arg_len = @{ $arg1 };
         if($arg_len < 2)
         {
             confess("Unexpected length of input array: $arg_len ");
         }
-        elif($arg_len > 2)
+        elsif($arg_len > 2)
         {
             # empty ndarray with shape
             __PACKAGE__->_check_shape($arg1, $shape);
@@ -1092,7 +1094,7 @@ method row_sparse_array(
             # create dns array with provided dtype. ctx is not passed since copy across
             # ctx requires dtype to be the same
             my $dns = __PACKAGE__->_array($arg1, dtype => $dtype);
-            if(defined $ctx is and $dns->context ne $ctx)
+            if(defined $ctx and $dns->context ne $ctx)
             {
                 $dns = $dns->as_in_context($ctx);
             }
@@ -1187,7 +1189,7 @@ method zeros(
     Maybe[Str] :$__layout__=
 )
 {
-    if(stype eq 'default')
+    if($stype eq 'default')
     {
         return AI::MXNet::NDArray->zeros(
             $shape, ctx => $ctx, dtype => $dtype, out => $out, name => $name, __layout__ => $__layout__
@@ -1202,98 +1204,118 @@ method zeros(
     {
         confess("unknown storage type: $stype");
     }
-    out = _ndarray_cls(_new_alloc_handle(stype, shape, ctx, True, dtype, aux_types))
-    return _internal._zeros(shape=shape, ctx=ctx, dtype=dtype, out=out, **kwargs)
+    my $out = __PACKAGE__->_ndarray_cls(
+        __PACKAGE__->_new_alloc_handle(
+            $stype, $shape, $ctx, 1, $dtype, $aux_types)
+    );
+    return __PACKAGE__->_zeros(
+        shape => $shape, ctx => $ctx, dtype => $dtype, out => $out,
+        ($name ? (name => $name) : ()), ($__layout__ ? (__layout__ => $__layout__) : ())
+    );
+}
 
+=head2 empty
 
-def empty(stype, shape, ctx=None, dtype=None):
-    """Returns a new array of given shape and type, without initializing entries.
+    Returns a new array of given shape and type, without initializing entries.
 
     Parameters
     ----------
     stype: string
         The storage type of the empty array, such as 'row_sparse', 'csr', etc
-    shape : int or tuple of int
+    shape : int or array ref of int
         The shape of the empty array.
     ctx : Context, optional
         An optional device context (default is the current default context).
-    dtype : str or numpy.dtype, optional
+    dtype : Dtype, optional
         An optional value type (default is `float32`).
 
     Returns
     -------
-    CSRNDArray or RowSparseNDArray
+    AI::MXNet::NDArray::CSR or AI::MXNet::NDArray::RowSparse
         A created array.
-    """
-    if isinstance(shape, int):
-        shape = (shape, )
-    if ctx is None:
-        ctx = Context.default_ctx
-    if dtype is None:
-        dtype = mx_real_t
-    assert(stype is not None)
-    if stype == 'csr' or stype == 'row_sparse':
-        return zeros(stype, shape, ctx=ctx, dtype=dtype)
-    else:
-        raise Exception("unknown stype : " + str(stype))
+=cut
 
+method empty(
+    Stype $stype,
+    Shape $shape,
+    Maybe[AI::MXNet::Context] :$ctx=AI::MXNet::Context->current_ctx,
+    Maybe[Dtype] :$dtype='float32'
+)
+{
+    assert(defined $stype);
+    return __PACKAGE__->zeros($stype, $shape, ctx => $ctx, dtype => $dtype);
+}
 
-def array(source_array, ctx=None, dtype=None):
-    """Creates a sparse array from any object exposing the array interface.
+=head2 array
+
+    Creates a sparse array from any object exposing the array interface.
 
     Parameters
     ----------
-    source_array : RowSparseNDArray, CSRNDArray or scipy.sparse.csr.csr_matrix
+    $source_array : AI::MXNet::NDArray::RowSparse, AI::MXNet::NDArray::CSR or PDL::CCS::Nd
         The source sparse array
-    ctx : Context, optional
-        The default context is ``source_array.context`` if ``source_array`` is an NDArray. \
+    :$ctx : Context, optional
+        The default context is $source_array->context if $source_array is an NDArray.
         The current default context otherwise.
-    dtype : str or numpy.dtype, optional
-        The data type of the output array. The default dtype is ``source_array.dtype``
-        if `source_array` is an `NDArray`, `numpy.ndarray` or `scipy.sparse.csr.csr_matrix`, \
-        `float32` otherwise.
+    :$dtype : Dtype, optional
+        The data type of the output array. The default dtype is $source_array->dtype
+        if $source_array is an AI::MXNet::NDArray, PDL or PDL::CCS::Nd
+        'float32' otherwise.
 
     Returns
     -------
-    RowSparseNDArray or CSRNDArray
-        An array with the same contents as the `source_array`.
+    AI::MXNet::NDArray::RowSparse or AI::MXNet::NDArray::CSR
+        An array with the same contents as the $source_array.
 
     Examples
     --------
-    >>> import scipy.sparse as spsp
-    >>> csr = spsp.csr_matrix((2, 100))
-    >>> mx.nd.sparse.array(csr)
-    <CSRNDArray 2x100 @cpu(0)>
-    >>> mx.nd.sparse.array(mx.nd.sparse.zeros('csr', (3, 2)))
-    <CSRNDArray 3x2 @cpu(0)>
-    >>> mx.nd.sparse.array(mx.nd.sparse.zeros('row_sparse', (3, 2)))
-    <RowSparseNDArray 3x2 @cpu(0)>
-    """
-    ctx = Context.default_ctx if ctx is None else ctx
-    if isinstance(source_array, NDArray):
-        assert(source_array.stype != 'default'), \
-               "Please use `tostype` to create RowSparseNDArray or CSRNDArray from an NDArray"
+    >>> use PDL; use PDL::CCS::Nd
+    >>> $csr = zeros([100, 2])->tocsr
+    >>> mx->nd->sparse->array($csr)
+    <AI::MXNet::NDArray::CSR 2x100 @cpu(0)>
+    >>> mx->nd->sparse->array(mx->nd->sparse->zeros('csr', [3, 2]))
+    <AI::MXNet::NDArray::CSR 3x2 @cpu(0)>
+    >>> mx->nd->sparse->array(mx->nd->sparse->zeros('row_sparse', [3, 2]))
+    <AI::MXNet::NDArray::RowSparse 3x2 @cpu(0)>
+=cut
+
+method array(
+    AI::MXNet::NDarray::CSR|AI::MXNet::RowSparse|PDL::CCS::Nd $source_array,
+    Maybe[AI::MXNet::Context] :$ctx=AI::MXNet::Context->current_ctx,
+    Maybe[Dtype] :$dtype=
+)
+{
+    if($source_array->isa('AI::MXNet::NDarray'))
+    {
+        assert(
+            ($source_array->stype ne 'default'),
+            "Please use tostype to create AI::MXNet::NDarray::RowSparse or AI::MXNet::NDarrayCSR from an AI::MXNet::NDarray"
+        );
         # prepare dtype and ctx based on source_array, if not provided
-        dtype = _prepare_default_dtype(source_array, dtype)
+        $dtype = __PACKAGE__->_prepare_default_dtype($source_array, $dtype);
         # if both dtype and ctx are different from source_array, we cannot copy directly
-        if source_array.dtype != dtype and source_array.context != ctx:
-            arr = empty(source_array.stype, source_array.shape, dtype=dtype)
-            arr[:] = source_array
-            arr = arr.as_in_context(ctx)
-        else:
-            arr = empty(source_array.stype, source_array.shape, dtype=dtype, ctx=ctx)
-            arr[:] = source_array
-        return arr
-    elif spsp and isinstance(source_array, spsp.csr.csr_matrix):
-        # TODO(haibin) implement `_sync_copy_from` with scipy csr object to reduce a copy
-        # preprocess scipy csr to canonical form
-        csr = source_array.sorted_indices()
-        csr.sum_duplicates()
-        dtype = _prepare_default_dtype(source_array, dtype)
-        return csr_matrix((csr.data, csr.indices, csr.indptr), shape=csr.shape, \
-                          dtype=dtype, ctx=ctx)
-    elif isinstance(source_array, (np.ndarray, np.generic)):
-        raise ValueError("Please use mx.nd.array to create an NDArray with source_array of type ",
-                         type(source_array))
-    else:
-        raise ValueError("Unexpected source_array type: ", type(source_array))
+        my $arr;
+        if($source_array->dtype ne $dtype and $source_array->context ne $ctx)
+        {
+            $arr = __PACKAGE__->empty($source_array->stype, $source_array->shape, dtype => $dtype);
+            $arr .= $source_array;
+            $arr = $arr->as_in_context($ctx);
+        }
+        else
+        {
+            $arr = __PACKAGE__->empty($source_array->stype, $source_array->shape, dtype => $dtype, ctx => $ctx);
+            $arr .= $source_array;
+        }
+        return $arr;
+    }
+    elsif($source_array->isa('PDL::CCS::Nd'))
+    {
+        $dtype = __PACKAGE__->_prepare_default_dtype($source_array, $dtype);
+        return __PACKAGE__->csr_matrix(
+            [$source_array->data, $source_array->indices, $source_array->indptr],
+            shape => $source_array->shape, dtype => $dtype, ctx => $ctx
+        );
+    }
+}
+
+1;
