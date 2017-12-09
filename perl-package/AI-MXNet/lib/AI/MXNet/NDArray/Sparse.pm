@@ -644,7 +644,7 @@ method set(RowSparseSetInput $other)
     }
     else
     {
-        my $tmp = _array($other);
+        my $tmp = __PACKAGE__->_array($other);
         $tmp->copyto($self);
     }
 }
