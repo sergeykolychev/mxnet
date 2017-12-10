@@ -182,9 +182,9 @@ struct PythonProfileObjects {
   std::mutex cs_events_;
   std::list<std::shared_ptr<profile::ProfileDomain>> domains_;
   std::unordered_map<profile::ProfileCounter *, std::shared_ptr<profile::ProfileCounter>> counters_;
-  std::unordered_map<profile::ProfileTask *, std::shared_ptr<profile::ProfileTask>> tasks_;
-  std::unordered_map<profile::ProfileFrame *, std::shared_ptr<profile::ProfileFrame>> frames_;
-  std::unordered_map<profile::ProfileEvent *, std::shared_ptr<profile::ProfileEvent>> events_;
+  std::unordered_map<profile::ProfileDuration *, std::shared_ptr<profile::ProfileDuration>> tasks_;
+  std::unordered_map<profile::ProfileDuration *, std::shared_ptr<profile::ProfileDuration>> frames_;
+  std::unordered_map<profile::ProfileDuration *, std::shared_ptr<profile::ProfileDuration>> events_;
 };
 static PythonProfileObjects python_profile_objects;
 
@@ -286,7 +286,7 @@ int MXSetDumpProfileAppendMode(int append) {
       profile::Profiler::Get()->SetDumpProfileAppendMode(append != 0);
     }
 #else
-      warn_not_built_with_profiler_enabled();
+    warn_not_built_with_profiler_enabled();
 #endif
   API_END();
 }
@@ -301,7 +301,7 @@ int MXSetContinuousProfileDump(int continuous_dump, float delay_in_seconds) {
   API_END();
 }
 
-int MXProfileCreateDomain(const char *domain, ProfileDomainHandle *out) {
+int MXProfileCreateDomain(const char *domain, ProfileHandle *out) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
@@ -318,9 +318,9 @@ int MXProfileCreateDomain(const char *domain, ProfileDomainHandle *out) {
   API_END();
 }
 
-int MXProfileCreateTask(ProfileDomainHandle domain,
-                           const char *task_name,
-                           ProfileTaskHandle *out) {
+int MXProfileCreateTask(ProfileHandle domain,
+                        const char *task_name,
+                        ProfileHandle *out) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
@@ -339,60 +339,15 @@ int MXProfileCreateTask(ProfileDomainHandle domain,
   API_END();
 }
 
-int MXProfileDestroyTask(ProfileTaskHandle task_handle) {
-  mxnet::IgnoreProfileCallScope ignore;
-  API_BEGIN();
-#if MXNET_USE_PROFILER
-    std::shared_ptr<profile::ProfileTask> shared_task_ptr(nullptr);
-    {
-      std::unique_lock<std::mutex> lock(python_profile_objects.cs_tasks_);
-      profile::ProfileTask *p = static_cast<profile::ProfileTask *>(task_handle);
-      auto iter = python_profile_objects.tasks_.find(p);
-      if (iter != python_profile_objects.tasks_.end()) {
-        shared_task_ptr = iter->second;
-        python_profile_objects.tasks_.erase(iter);
-      }
-    }
-    shared_task_ptr.reset();  // Destroy out of lock scope
-#else
-    warn_not_built_with_profiler_enabled();
-#endif
-  API_END();
-}
-
-int MXProfileTaskStart(ProfileTaskHandle task_handle) {
-  mxnet::IgnoreProfileCallScope ignore;
-  API_BEGIN();
-#if MXNET_USE_PROFILER
-    CHECK_NOTNULL(task_handle);
-    static_cast<profile::ProfileTask *>(task_handle)->start();
-#else
-    warn_not_built_with_profiler_enabled();
-#endif
-  API_END();
-}
-
-int MXProfileTaskStop(ProfileTaskHandle task_handle) {
-  mxnet::IgnoreProfileCallScope ignore;
-  API_BEGIN();
-#if MXNET_USE_PROFILER
-    CHECK_NOTNULL(task_handle);
-    static_cast<profile::ProfileTask *>(task_handle)->stop();
-#else
-    warn_not_built_with_profiler_enabled();
-#endif
-  API_END();
-}
-
-int MXProfileCreateFrame(ProfileDomainHandle domain,
-                        const char *frame_name,
-                        ProfileFrameHandle *out) {
+int MXProfileCreateFrame(ProfileHandle domain,
+                         const char *frame_name,
+                         ProfileHandle *out) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
     auto ctr =
       std::make_shared<profile::ProfileFrame>(frame_name,
-                                             static_cast<profile::ProfileDomain *>(domain));
+                                              static_cast<profile::ProfileDomain *>(domain));
     {
       std::unique_lock<std::mutex> lock(python_profile_objects.cs_frames_);
       python_profile_objects.frames_.emplace(std::make_pair(ctr.get(), ctr));
@@ -405,52 +360,7 @@ int MXProfileCreateFrame(ProfileDomainHandle domain,
   API_END();
 }
 
-int MXProfileDestroyFrame(ProfileFrameHandle frame_handle) {
-  mxnet::IgnoreProfileCallScope ignore;
-  API_BEGIN();
-#if MXNET_USE_PROFILER
-    std::shared_ptr<profile::ProfileFrame> shared_frame_ptr(nullptr);
-    {
-      std::unique_lock<std::mutex> lock(python_profile_objects.cs_frames_);
-      profile::ProfileFrame *p = static_cast<profile::ProfileFrame *>(frame_handle);
-      auto iter = python_profile_objects.frames_.find(p);
-      if (iter != python_profile_objects.frames_.end()) {
-        shared_frame_ptr = iter->second;
-        python_profile_objects.frames_.erase(iter);
-      }
-    }
-    shared_frame_ptr.reset();  // Destroy out of lock scope
-#else
-    warn_not_built_with_profiler_enabled();
-#endif
-  API_END();
-}
-
-int MXProfileFrameStart(ProfileFrameHandle frame_handle) {
-  mxnet::IgnoreProfileCallScope ignore;
-  API_BEGIN();
-#if MXNET_USE_PROFILER
-    CHECK_NOTNULL(frame_handle);
-    static_cast<profile::ProfileFrame *>(frame_handle)->stop();
-#else
-    warn_not_built_with_profiler_enabled();
-#endif
-  API_END();
-}
-
-int MXProfileFrameStop(ProfileFrameHandle frame_handle) {
-  mxnet::IgnoreProfileCallScope ignore;
-  API_BEGIN();
-#if MXNET_USE_PROFILER
-    CHECK_NOTNULL(frame_handle);
-    static_cast<profile::ProfileFrame *>(frame_handle)->stop();
-#else
-    warn_not_built_with_profiler_enabled();
-#endif
-  API_END();
-}
-
-int MXProfileCreateEvent(const char *event_name, ProfileEventHandle *out) {
+int MXProfileCreateEvent(const char *event_name, ProfileHandle *out) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
@@ -468,78 +378,112 @@ int MXProfileCreateEvent(const char *event_name, ProfileEventHandle *out) {
   API_END();
 }
 
-int MXProfileDestroyEvent(ProfileEventHandle event_handle) {
+int MXProfileDestroyHandle(ProfileHandle object_handle) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
-    std::shared_ptr<profile::ProfileEvent> shared_event_ptr(nullptr);
+    CHECK_NE(object_handle, static_cast<ProfileHandle>(nullptr))
+      << "Invalid NULL handle passed to MXProfileDestroyHandle";
+    std::shared_ptr<profile::ProfileObject> shared_object_ptr(nullptr);
     {
-      std::unique_lock<std::mutex> lock(python_profile_objects.cs_events_);
-      profile::ProfileEvent *p = static_cast<profile::ProfileEvent *>(event_handle);
-      auto iter = python_profile_objects.events_.find(p);
-      if (iter != python_profile_objects.events_.end()) {
-        shared_event_ptr = iter->second;
-        python_profile_objects.events_.erase(iter);
+      auto object = static_cast<profile::ProfileObject *>(object_handle);
+      switch (object->type()) {
+        case profile::kTask: {
+          auto p = static_cast<profile::ProfileDuration *>(object_handle);
+          std::unique_lock<std::mutex> lock(python_profile_objects.cs_tasks_);
+          auto iter = python_profile_objects.tasks_.find(p);
+          if (iter != python_profile_objects.tasks_.end()) {
+            shared_object_ptr = iter->second;
+            python_profile_objects.tasks_.erase(iter);
+          }
+          break;
+        }
+        case profile::kEvent: {
+          auto p = static_cast<profile::ProfileDuration *>(object_handle);
+          std::unique_lock<std::mutex> lock(python_profile_objects.cs_events_);
+          auto iter = python_profile_objects.events_.find(p);
+          if (iter != python_profile_objects.events_.end()) {
+            shared_object_ptr = iter->second;
+            python_profile_objects.events_.erase(iter);
+          }
+          break;
+        }
+        case profile::kFrame: {
+          auto p = static_cast<profile::ProfileDuration *>(object_handle);
+          std::unique_lock<std::mutex> lock(python_profile_objects.cs_frames_);
+          auto iter = python_profile_objects.frames_.find(p);
+          if (iter != python_profile_objects.frames_.end()) {
+            shared_object_ptr = iter->second;
+            python_profile_objects.frames_.erase(iter);
+          }
+          break;
+        }
+        case profile::kCounter: {
+          auto p = static_cast<profile::ProfileCounter *>(object_handle);
+          std::unique_lock<std::mutex> lock(python_profile_objects.cs_counters_);
+          auto iter = python_profile_objects.counters_.find(p);
+          if (iter != python_profile_objects.counters_.end()) {
+            shared_object_ptr = iter->second;
+            python_profile_objects.counters_.erase(iter);
+          }
+          break;
+        }
+        case profile::kDomain:
+          // Not destroyed
+          break;
       }
     }
-    shared_event_ptr.reset();  // Destroy out of lock scope
+    shared_object_ptr.reset();  // Destroy out of lock scope
 #else
     warn_not_built_with_profiler_enabled();
 #endif
   API_END();
 }
 
-int MXProfileEventStart(ProfileEventHandle event_handle) {
+int MXProfileDurationStart(ProfileHandle duration_handle) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
-    CHECK_NOTNULL(event_handle);
-    static_cast<profile::ProfileEvent *>(event_handle)->start();
+    CHECK_NOTNULL(duration_handle);
+    static_cast<profile::ProfileDuration *>(duration_handle)->start();
 #else
     warn_not_built_with_profiler_enabled();
 #endif
   API_END();
 }
 
-int MXProfileEventStop(ProfileEventHandle event_handle) {
+int MXProfileDurationStop(ProfileHandle duration_handle) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
-    CHECK_NOTNULL(event_handle);
-    static_cast<profile::ProfileEvent *>(event_handle)->stop();
+    CHECK_NOTNULL(duration_handle);
+    static_cast<profile::ProfileDuration *>(duration_handle)->stop();
 #else
     warn_not_built_with_profiler_enabled();
 #endif
   API_END();
 }
 
-int MXProfileTunePause() {
+int MXProfilePause(int paused) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
-    common::vtune_pause();
-    profile::Profiler::Get()->set_paused(true);
+    if(paused) {
+      common::vtune_pause();
+      profile::Profiler::Get()->set_paused(true);
+    } else {
+      profile::Profiler::Get()->set_paused(false);
+      common::vtune_resume();
+    }
 #else
     warn_not_built_with_profiler_enabled();
 #endif
   API_END();
 }
 
-int MXProfileTuneResume() {
-  mxnet::IgnoreProfileCallScope ignore;
-  API_BEGIN();
-#if MXNET_USE_PROFILER
-    profile::Profiler::Get()->set_paused(false);
-    common::vtune_resume();
-#else
-    warn_not_built_with_profiler_enabled();
-#endif
-  API_END();
-}
-
-int MXProfileCreateCounter(ProfileDomainHandle domain,
+int MXProfileCreateCounter(ProfileHandle domain,
                            const char *counter_name,
-                           ProfileCounterHandle *out) {
+                           ProfileHandle *out) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
@@ -558,28 +502,7 @@ int MXProfileCreateCounter(ProfileDomainHandle domain,
   API_END();
 }
 
-int MXProfileDestroyCounter(ProfileCounterHandle counter_handle) {
-  mxnet::IgnoreProfileCallScope ignore;
-  API_BEGIN();
-#if MXNET_USE_PROFILER
-    std::shared_ptr<profile::ProfileCounter> shared_counter_ptr(nullptr);
-    {
-      std::unique_lock<std::mutex> lock(python_profile_objects.cs_counters_);
-      profile::ProfileCounter *p = static_cast<profile::ProfileCounter *>(counter_handle);
-      auto iter = python_profile_objects.counters_.find(p);
-      if (iter != python_profile_objects.counters_.end()) {
-        shared_counter_ptr = iter->second;
-        python_profile_objects.counters_.erase(iter);
-      }
-    }
-    shared_counter_ptr.reset();  // Destroy out of lock scope
-#else
-    warn_not_built_with_profiler_enabled();
-#endif
-  API_END();
-}
-
-int MXProfileSetCounter(ProfileCounterHandle counter_handle, uint64_t value) {
+int MXProfileSetCounter(ProfileHandle counter_handle, uint64_t value) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
@@ -590,7 +513,7 @@ int MXProfileSetCounter(ProfileCounterHandle counter_handle, uint64_t value) {
   API_END();
 }
 
-int MXProfileAdjustCounter(ProfileCounterHandle counter_handle, int64_t by_value) {
+int MXProfileAdjustCounter(ProfileHandle counter_handle, int64_t by_value) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
@@ -601,7 +524,7 @@ int MXProfileAdjustCounter(ProfileCounterHandle counter_handle, int64_t by_value
   API_END();
 }
 
-int MXProfileSetInstantMarker(ProfileDomainHandle domain,
+int MXProfileSetInstantMarker(ProfileHandle domain,
                               const char *instant_marker_name,
                               const char *scope) {
   mxnet::IgnoreProfileCallScope ignore;

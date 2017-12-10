@@ -204,26 +204,6 @@ struct ProfileStat {
 };
 
 /*!
- * \brief Basic duration statistic (start time, stop time)
- */
-struct DurationStat : public ProfileStat {
-  enum DurationStatIndex {
-    kStart, kStop
-  };
-  /*!
-   * \brief Constructor
-   * \param begin_event Event type for start point (default is kDurationBegin)
-   * \param end_event Event type for stop point (default is kDurationEnd)
-   */
-  DurationStat(ProfileStat::EventType begin_event = ProfileStat::kDurationBegin,
-               ProfileStat::EventType end_event = ProfileStat::kDurationEnd) {
-    items_[kStart].enabled_ = items_[kStop].enabled_ = true;
-    items_[kStart].event_type_ = begin_event;
-    items_[kStop].event_type_ = end_event;
-  }
-};
-
-/*!
  * \brief Device statistics
  */
 struct DeviceStats {
@@ -462,11 +442,32 @@ class Profiler {
  *                                       |___/             |__/
  */
 
+enum ProfileObjectType {
+  kDomain,
+  kCounter,
+  kTask,
+  kEvent,
+  kFrame
+};
+
+class ProfileObject {
+ public:
+  /*!
+   * \brief Virtual destructor for child classes
+   */
+  virtual ~ProfileObject() {}
+  /*!
+   * \brief Return profiling object object type (i.e. kTask, kEvent, ...)
+   * \return Profiling object type
+   */
+  virtual ProfileObjectType type() const = 0;
+};
+
 /*!
  * \brief Tuning domain. Used in VTune to separate similar tasks/counters/etc. (for example).
  *        For chrome tracing, generally maps to category.
  */
-struct ProfileDomain {
+struct ProfileDomain : public ProfileObject {
   /*!:(
    * \brief Constructor
    * \param name Name of the domain
@@ -482,6 +483,7 @@ struct ProfileDomain {
    * \return Domain name
    */
   const char *name() const { return name_.c_str(); }
+  ProfileObjectType type() const override { return kDomain; }
   VTUNE_ONLY_CODE(inline common::VTuneDomain *dom() { return vtune_domain_.get(); });
  private:
   /*! \brief Name of the domain */
@@ -493,7 +495,7 @@ struct ProfileDomain {
 /*!
  * \brief Counter object and statistic item
  */
-struct ProfileCounter {
+struct ProfileCounter : public ProfileObject {
   /*!
    * \brief Co9nstructor
    * \param name Counter name
@@ -553,6 +555,8 @@ struct ProfileCounter {
     SetValue(v);
     return *this;
   }
+
+  ProfileObjectType type() const override { return kCounter; }
 
  protected:
   /*!
@@ -628,10 +632,38 @@ struct ProfileCounter {
   VTUNE_ONLY_CODE(std::unique_ptr<common::VTuneCounter> vtune_);
 };
 
+class ProfileDuration : public ProfileObject {
+ public:
+  virtual void start() = 0;
+  virtual void stop() = 0;
+
+ protected:
+  /*!
+   * \brief Basic duration statistic (start time, stop time)
+   */
+  struct DurationStat : public ProfileStat {
+    enum DurationStatIndex {
+      kStart, kStop
+    };
+    /*!
+     * \brief Constructor
+     * \param begin_event Event type for start point (default is kDurationBegin)
+     * \param end_event Event type for stop point (default is kDurationEnd)
+     */
+    DurationStat(ProfileStat::EventType begin_event = ProfileStat::kDurationBegin,
+                 ProfileStat::EventType end_event = ProfileStat::kDurationEnd) {
+      items_[kStart].enabled_ = items_[kStop].enabled_ = true;
+      items_[kStart].event_type_ = begin_event;
+      items_[kStop].event_type_ = end_event;
+    }
+  };
+
+};
+
 /*!
  * \brief Task - Thread-granular nestable time block
  */
-struct ProfileTask {
+struct ProfileTask : public ProfileDuration {
   /*!
    * \brief Constructor
    * \param name Name of the task
@@ -649,7 +681,7 @@ struct ProfileTask {
   /*!
    * \brief Start the profiling scope
    */
-  void start() {
+  void start() override {
     start_time_ = ProfileStat::NowInMicrosec();
     VTUNE_ONLY_CODE(vtune_task_->start());
   }
@@ -657,10 +689,12 @@ struct ProfileTask {
   /*!
    * \brief Stop the profiling scope
    */
-  void stop() {
+  void stop() override {
     VTUNE_ONLY_CODE(vtune_task_->stop());
     SendStat();
   }
+
+  ProfileObjectType type() const override { return kTask; }
 
  protected:
   /*!
@@ -705,7 +739,7 @@ struct ProfileTask {
 /*!
  * \brief Event - Thread-granular time block
  */
-struct ProfileEvent {
+struct ProfileEvent  : public ProfileDuration {
   /*!
    * \brief Constructor
    * \param name Name of the event
@@ -719,7 +753,7 @@ struct ProfileEvent {
   /*!
    * \brief Start the profiling scope
    */
-  virtual void start() {
+  virtual void start() override {
     start_time_ = ProfileStat::NowInMicrosec();
     VTUNE_ONLY_CODE(vtune_event_->start());
   }
@@ -727,7 +761,7 @@ struct ProfileEvent {
   /*!
    * \brief Stop the profiling scope
    */
-  virtual void stop() {
+  virtual void stop() override {
     VTUNE_ONLY_CODE(vtune_event_->stop());
     SendStat();
   }
@@ -739,6 +773,8 @@ struct ProfileEvent {
   void SetCategories(const char *categories) {
     categories_.set(categories);
   }
+
+  ProfileObjectType type() const override { return kEvent; }
 
  protected:
   /*!
@@ -777,7 +813,7 @@ struct ProfileEvent {
 /*!
  * \brief Frame - Process-granular time block
  */
-struct ProfileFrame {
+struct ProfileFrame : public ProfileDuration {
   /*!
    * \brief Constructor
    * \param name Name of the frame
@@ -795,7 +831,7 @@ struct ProfileFrame {
   /*!
    * \brief Start the profiling scope
    */
-  void start() {
+  void start() override {
     start_time_ = ProfileStat::NowInMicrosec();
     VTUNE_ONLY_CODE(vtune_frame_->start());
   }
@@ -803,10 +839,12 @@ struct ProfileFrame {
   /*!
    * \brief Stop the profiling scope
    */
-  void stop() {
+  void stop() override {
     VTUNE_ONLY_CODE(vtune_frame_->stop());
     SendStat();
   }
+
+  ProfileObjectType type() const override { return kFrame; }
 
  protected:
   /*!
@@ -943,34 +981,6 @@ struct ProfileInstantMarker {
 };
 
 /*!
- * \brief Operation execution statistics
- */
-struct OprExecStat : public DurationStat {
-  /*!
-   * \brief Constructor
-   * \param name Name of the operator
-   * \param dev_type Device type (i.e. CPU: 1, GPU: 2, CPUPinned: 3)
-   * \param dev_id Device ID (ie GPU number)
-   * \param start_time Time when operator starts
-   * \param stop_time Time when operator completes
-   */
-  inline OprExecStat(const char *name, mxnet::Context::DeviceType dev_type, uint32_t dev_id,
-                     uint64_t start_time, uint64_t stop_time)
-    : DurationStat(ProfileStat::kDurationBegin, ProfileStat::kDurationEnd)
-      , dev_type_(dev_type)
-      , dev_id_(dev_id) {
-    name_.set(name);
-    categories_.set("operator");
-    items_[kStart].timestamp_ = start_time;
-    items_[kStop].timestamp_ = stop_time;
-  }
-  /*! \brief device type: CPU: 1, GPU: 2, CPUPinned: 3 */
-  mxnet::Context::DeviceType dev_type_;
-  /*! \brief device id */
-  uint32_t dev_id_;
-};
-
-/*!
  * \brief Operator profiler object. Logs as both an independent event and a task in
  * the operator domain
  */
@@ -1003,6 +1013,34 @@ struct ProfileOperator : public ProfileEvent {
     as_task_.stop();
     ProfileEvent::stop();
   }
+
+  /*!
+   * \brief Operation execution statistics
+   */
+  struct OprExecStat : public DurationStat {
+    /*!
+     * \brief Constructor
+     * \param name Name of the operator
+     * \param dev_type Device type (i.e. CPU: 1, GPU: 2, CPUPinned: 3)
+     * \param dev_id Device ID (ie GPU number)
+     * \param start_time Time when operator starts
+     * \param stop_time Time when operator completes
+     */
+    inline OprExecStat(const char *name, mxnet::Context::DeviceType dev_type, uint32_t dev_id,
+                       uint64_t start_time, uint64_t stop_time)
+      : DurationStat(ProfileStat::kDurationBegin, ProfileStat::kDurationEnd)
+        , dev_type_(dev_type)
+        , dev_id_(dev_id) {
+      name_.set(name);
+      categories_.set("operator");
+      items_[kStart].timestamp_ = start_time;
+      items_[kStop].timestamp_ = stop_time;
+    }
+    /*! \brief device type: CPU: 1, GPU: 2, CPUPinned: 3 */
+    mxnet::Context::DeviceType dev_type_;
+    /*! \brief device id */
+    uint32_t dev_id_;
+  };
 
  private:
   /*!
@@ -1056,7 +1094,8 @@ inline size_t Profiler::DeviceIndex(mxnet::Context::DeviceType dev_type, int32_t
  * \param opr_stat Unique pointert to the operator statistic
  */
 template<>
-inline void Profiler::AddProfileStat<OprExecStat>(std::unique_ptr<OprExecStat> *opr_stat) {
+inline void Profiler::AddProfileStat<ProfileOperator::OprExecStat>(
+  std::unique_ptr<ProfileOperator::OprExecStat> *opr_stat) {
   const size_t idx = DeviceIndex((*opr_stat)->dev_type_, (*opr_stat)->dev_id_);
   CHECK_LT(idx, DeviceCount());
   DeviceStats& dev_stat = profile_stat[idx];

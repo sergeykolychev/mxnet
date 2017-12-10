@@ -21,8 +21,7 @@
 """Profiler setting methods."""
 from __future__ import absolute_import
 import ctypes
-from .base import _LIB, check_call, c_str, ProfileDomainHandle, \
-    ProfileCounterHandle, ProfileTaskHandle, ProfileFrameHandle, ProfileEventHandle
+from .base import _LIB, check_call, c_str, ProfileHandle
 
 def profiler_set_config(mode='symbolic', filename='profile.json'):
     """Set up the configure of profiler.
@@ -56,64 +55,64 @@ def dump_profile():
     check_call(_LIB.MXDumpProfile())
 
 def create_domain(name):
-  domain_handle = ProfileDomainHandle()
-  check_call(_LIB.MXProfileCreateDomain(c_str(name), ctypes.byref(domain_handle)))
-  return domain_handle
+    domain_handle = ProfileHandle()
+    check_call(_LIB.MXProfileCreateDomain(c_str(name), ctypes.byref(domain_handle)))
+    return domain_handle
 
 def create_task(domain_handle, name):
-    task_handle = ProfileTaskHandle()
+    task_handle = ProfileHandle()
     check_call(_LIB.MXProfileCreateTask(domain_handle,
                                         c_str(name),
                                         ctypes.byref(task_handle)))
     return task_handle
 
 def destroy_task(task_handle):
-    check_call(_LIB.MXProfileDestroyTask(task_handle))
+    check_call(_LIB.MXProfileDestroyHandle(task_handle))
 
 def task_start(task_handle):
-    check_call(_LIB.MXProfileTaskStart(task_handle))
+    check_call(_LIB.MXProfileDurationStart(task_handle))
 
 def task_stop(task_handle):
-    check_call(_LIB.MXProfileTaskStop(task_handle))
+    check_call(_LIB.MXProfileDurationStop(task_handle))
 
 def create_frame(domain_handle, name):
-    frame_handle = ProfileFrameHandle()
+    frame_handle = ProfileHandle()
     check_call(_LIB.MXProfileCreateFrame(domain_handle,
-                                        c_str(name),
-                                        ctypes.byref(frame_handle)))
+                                         c_str(name),
+                                         ctypes.byref(frame_handle)))
     return frame_handle
 
 def destroy_frame(frame_handle):
-    check_call(_LIB.MXProfileDestroyFrame(frame_handle))
+    check_call(_LIB.MXProfileDestroyHandle(frame_handle))
 
 def frame_start(frame_handle):
-    check_call(_LIB.MXProfileFrameStart(frame_handle))
+    check_call(_LIB.MXProfileDurationStart(frame_handle))
 
 def frame_stop(frame_handle):
-    check_call(_LIB.MXProfileFrameStop(frame_handle))
+    check_call(_LIB.MXProfileDurationStop(frame_handle))
 
 def create_event(name):
-    event_handle = ProfileEventHandle()
+    event_handle = ProfileHandle()
     check_call(_LIB.MXProfileCreateEvent(c_str(name), ctypes.byref(event_handle)))
     return event_handle
 
 def destroy_event(event_handle):
-    check_call(_LIB.MXProfileDestroyEvent(event_handle))
+    check_call(_LIB.MXProfileDestroyHandle(event_handle))
 
 def event_start(event_handle):
-    check_call(_LIB.MXProfileEventStart(event_handle))
+    check_call(_LIB.MXProfileDurationStart(event_handle))
 
 def event_stop(event_handle):
-    check_call(_LIB.MXProfileEventStop(event_handle))
+    check_call(_LIB.MXProfileDurationStop(event_handle))
 
 def tune_pause():
-    check_call(_LIB.MXProfileTunePause())
+    check_call(_LIB.MXProfilePause(int(1)))
 
 def tune_resume():
-    check_call(_LIB.MXProfileTuneResume())
+    check_call(_LIB.MXProfilePause(int(0)))
 
 def create_counter(domain_handle, name, value=None):
-    counter_handle = ProfileCounterHandle()
+    counter_handle = ProfileHandle()
     check_call(_LIB.MXProfileCreateCounter(domain_handle,
                                            c_str(name),
                                            ctypes.byref(counter_handle)))
@@ -122,7 +121,7 @@ def create_counter(domain_handle, name, value=None):
     return counter_handle
 
 def destroy_counter(counter_handle):
-    check_call(_LIB.MXProfileDestroyCounter(counter_handle))
+    check_call(_LIB.MXProfileDestroyHandle(counter_handle))
 
 def set_counter(counter_handle, value):
     check_call(_LIB.MXProfileSetCounter(counter_handle, int(value)))
@@ -134,19 +133,19 @@ def decrement_counter(counter_handle, by_value):
     check_call(_LIB.MXProfileAdjustCounter(counter_handle, -int(by_value)))
 
 def set_append_mode(mode):
-  if mode is False:
-    mode = 0
-  else:
-    mode = 1
-  check_call(_LIB.MXSetDumpProfileAppendMode(int(mode)))
+    if mode is False:
+        mode = 0
+    else:
+        mode = 1
+    check_call(_LIB.MXSetDumpProfileAppendMode(int(mode)))
 
 def set_continuous_dump(continuous_dump=True, delay_in_seconds=1.0):
-  if continuous_dump is False:
-    cd = 0
-  else:
-    cd = 1
-  ds = float(delay_in_seconds)
-  check_call(_LIB.MXSetContinuousProfileDump(ctypes.c_int(cd), ctypes.c_float(ds)))
+    if continuous_dump is False:
+        cd = 0
+    else:
+        cd = 1
+    ds = float(delay_in_seconds)
+    check_call(_LIB.MXSetContinuousProfileDump(ctypes.c_int(cd), ctypes.c_float(ds)))
 
 def set_instant_marker(domain_handle, name, scope='process'):
     check_call(_LIB.MXProfileSetInstantMarker(domain_handle, c_str(name), c_str(scope)))
