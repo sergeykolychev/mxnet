@@ -130,7 +130,7 @@ class OperatorRunner {
    * \param dim Data dimensions
    * \param count Number of times to run in each direction
    */
-  std::unordered_map<int, perf::Info>
+  std::unordered_map<int, perf::TimingInstrument::Info>
   TimingTest(const std::string& label,
              const bool isGPU,
              const bool stochastic,

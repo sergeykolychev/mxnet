@@ -19,8 +19,8 @@
 
 /*!
  * Copyright (c) 2017 by Contributors
- * \file perf.h
- * \brief operator performance classes and functions
+ * \file test_perf.h
+ * \brief operator unit test utility functions
  * \author Chris Olivier
 */
 
@@ -92,41 +92,13 @@ inline uint64_t getNannoTickCount() {
 #define MICRO2S(__micro$)   (((__micro$) + 500000)/1000000)
 #define MICRO2SF(__micro$)  (MICRO2MSF(__micro$)/1000)
 
-struct Info {
-  explicit inline Info(const char *s)
-    : name_(s ? s : "")
-      , baseTime_(0)
-      , nestingCount_(0)
-      , cycleCount_(0)
-      , duration_(0) {}
-
-  inline Info(const Info &o)
-    : name_(o.name_)
-      , baseTime_(o.baseTime_.load())
-      , nestingCount_(o.nestingCount_.load())
-      , cycleCount_(o.cycleCount_.load())
-      , duration_(o.duration_.load()) {
-    CHECK_EQ(o.nestingCount_, 0U);
-  }
-
-  /*!
-   * \brief Return time for each operation in milliseconds
-   * \return Time for each operation in milliseconds
-   */
-  inline double TimeEach() const {
-    return static_cast<double>(duration_) / cycleCount_.load() / 1000.0f;
-  }
-
-  std::string name_;
-  std::atomic<uint64_t> baseTime_;
-  std::atomic<uint64_t> nestingCount_;
-  std::atomic<uint64_t> cycleCount_;  // Note that nesting may skew averages
-  std::atomic<uint64_t> duration_;
-};
-
-
 /*! \brief Calculate time between construction and destruction */
 class TimedScope {
+  std::string     label_;
+  uint64_t        startTime_;
+  uint64_t        stopTime_;
+  const size_t    count_;
+
  public:
   explicit inline TimedScope(const char *msg = nullptr, size_t count = 1, const bool start = true)
     : startTime_(start ? getMicroTickCount() : 0)
@@ -182,12 +154,6 @@ class TimedScope {
     }
     std::cout << ss.str() << std::endl;
   }
-
- private:
-  std::string label_;
-  uint64_t startTime_;
-  uint64_t stopTime_;
-  const size_t count_;
 };
 
 /*! \brief Accumulate separate timing values mapped by label/id -> total time spent */
@@ -196,7 +162,6 @@ class TimingInstrument {
   explicit TimingInstrument(const char *name = "")
     : name_(name) {
   }
-
   void startTiming(int id, const char *s) {
     std::unique_lock<std::recursive_mutex> lk(mutex_);
     auto i = data_.find(id);
@@ -207,7 +172,6 @@ class TimingInstrument {
       i->second.baseTime_ = getMicroTickCount();
     }
   }
-
   void stopTiming(int id, const size_t subIterationCount = 1) {
     std::unique_lock<std::recursive_mutex> lk(mutex_);
     auto i = data_.find(id);
@@ -222,7 +186,6 @@ class TimingInstrument {
       }
     }
   }
-
   uint64_t getDuration(int id) {
     std::unique_lock<std::recursive_mutex> lk(mutex_);
     auto i = data_.find(id);
@@ -236,7 +199,6 @@ class TimingInstrument {
     }
     return 0;
   }
-
   bool isTiming(int id) {
     std::unordered_map<int, Info>::const_iterator i = data_.find(id);
     if (i != data_.end()) {
@@ -344,7 +306,7 @@ class TimingInstrument {
     std::atomic<uint64_t> duration_;
   };
 
-  typedef std::unordered_map<int, Info> timing_map_t;
+  typedef std::unordered_map<int, TimingInstrument::Info> timing_map_t;
 
   const timing_map_t &data() const {
     return data_;
@@ -372,7 +334,6 @@ class TimingItem {
       ti_->startTiming(id, name);
     }
   }
-
   inline ~TimingItem() {
     if (ti_) {
       ti_->stopTiming(id_, subIterationCount_);
