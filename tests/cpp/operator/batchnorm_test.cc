@@ -764,7 +764,7 @@ static void timingTest(const std::string& label,
     count = 1;
   }
 
-  mxnet::test::perf::TimingInstrument timing;
+  test::perf::TimingInstrument timing;
 
   std::stringstream ss;
   ss << "Timing: " << COUNT << " iterations";

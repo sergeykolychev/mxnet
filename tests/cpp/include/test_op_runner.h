@@ -143,7 +143,7 @@ class OperatorRunner {
       count = 1;
     }
 
-    mxnet::test::perf::TimingInstrument timing;
+    test::perf::TimingInstrument timing;
 
     std::stringstream ss;
     ss << "Timing: " << total_iterations_ << " iterations of " << count << " calls";
