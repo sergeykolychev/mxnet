@@ -468,7 +468,7 @@ int MXProfilePause(int paused) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
-    if(paused) {
+    if (paused) {
       common::vtune_pause();
       profile::Profiler::Get()->set_paused(true);
     } else {

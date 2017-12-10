@@ -30,6 +30,7 @@
 #include <dmlc/thread_group.h>
 #include <mshadow/base.h>
 #include <atomic>
+#include <string>
 #include <unordered_map>
 
 #if MXNET_USE_VTUNE
@@ -110,7 +111,7 @@ class VTuneRegistry {
   inline VTuneObject *get(const char *name, Args... args) {
     dmlc::ReadLock read_lock(m_);
     auto iter = registry_.find(name);
-    if(iter == registry_.end()) {
+    if (iter == registry_.end()) {
       dmlc::WriteLock write_lock(m_);
       iter = registry_.emplace(name, std::unique_ptr<VTuneObject>(
         new VTuneObject(name, args...))).first;
@@ -130,7 +131,7 @@ class VTuneRegistry {
   inline VTuneObject *get(const char *name, const VTuneDomain *domain, Args... args) {
     dmlc::ReadLock read_lock(m_);
     auto iter = registry_.find(name);
-    if(iter == registry_.end()) {
+    if (iter == registry_.end()) {
       dmlc::WriteLock write_lock(m_);
       std::unique_ptr<VTuneObject> ev(new VTuneObject(name, domain, args...));
       iter = registry_.emplace(name, std::unique_ptr<VTuneObject>(

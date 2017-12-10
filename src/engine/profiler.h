@@ -657,7 +657,6 @@ class ProfileDuration : public ProfileObject {
       items_[kStop].event_type_ = end_event;
     }
   };
-
 };
 
 /*!
@@ -753,7 +752,7 @@ struct ProfileEvent  : public ProfileDuration {
   /*!
    * \brief Start the profiling scope
    */
-  virtual void start() override {
+  void start() override {
     start_time_ = ProfileStat::NowInMicrosec();
     VTUNE_ONLY_CODE(vtune_event_->start());
   }
@@ -761,7 +760,7 @@ struct ProfileEvent  : public ProfileDuration {
   /*!
    * \brief Stop the profiling scope
    */
-  virtual void stop() override {
+  void stop() override {
     VTUNE_ONLY_CODE(vtune_event_->stop());
     SendStat();
   }
