@@ -22,7 +22,7 @@
 #include <mxnet/storage.h>
 #include <string>
 #include <vector>
-#include "../engine/profiler.h"
+#include "profiler/profiler.h"
 
 namespace mxnet {
 namespace storage {
@@ -46,9 +46,9 @@ class DeviceStorageProfiler {
    */
   void OnAlloc(const Storage::Handle &handle) {
     if (handle.size > 0) {
-      profile::Profiler *prof = profile::Profiler::Get();
-      if (prof->GetState() == profile::Profiler::kRunning
-          && (prof->GetMode() & profile::Profiler::kMemory) == profile::Profiler::kMemory) {
+      profiler::Profiler *prof = profiler::Profiler::Get();
+      if (prof->GetState() == profiler::Profiler::kRunning
+          && (prof->GetMode() & profiler::Profiler::kMemory) == profiler::Profiler::kMemory) {
         Init();
         const size_t idx = prof->DeviceIndex(handle.ctx.dev_type, handle.ctx.dev_id);
         CHECK_LT(idx, mem_counters_.size()) << "Invalid device index: " << idx;
@@ -63,9 +63,9 @@ class DeviceStorageProfiler {
    */
   void OnFree(const Storage::Handle &handle) {
     if (handle.size > 0) {
-      profile::Profiler *prof = profile::Profiler::Get();
-      if (prof->GetState() == profile::Profiler::kRunning
-          && (prof->GetMode() & profile::Profiler::kMemory) == profile::Profiler::kMemory) {
+      profiler::Profiler *prof = profiler::Profiler::Get();
+      if (prof->GetState() == profiler::Profiler::kRunning
+          && (prof->GetMode() & profiler::Profiler::kMemory) == profiler::Profiler::kMemory) {
         Init();  // In case of bug which tries to free first
         const size_t idx = prof->DeviceIndex(handle.ctx.dev_type, handle.ctx.dev_id);
         CHECK_LT(idx, mem_counters_.size()) << "Invalid device index: " << idx;
@@ -84,13 +84,13 @@ class DeviceStorageProfiler {
       std::unique_lock<std::mutex> lk(init_mutex_);
       // Check again in case of collision and someone else filled it
       if (mem_counters_.empty()) {
-        profile::Profiler *prof = profile::Profiler::Get();
+        profiler::Profiler *prof = profiler::Profiler::Get();
         const size_t device_count = prof->DeviceCount();
         mem_counters_.reserve(device_count);
         for (size_t i = 0, n = device_count; i < n; ++i) {
           std::string name = "Memory: ";
           name += prof->DeviceName(i);
-          mem_counters_.emplace_back(std::make_shared<profile::ProfileCounter>(name.c_str(),
+          mem_counters_.emplace_back(std::make_shared<profiler::ProfileCounter>(name.c_str(),
                                                                               &domain_));
         }
       }
@@ -98,11 +98,11 @@ class DeviceStorageProfiler {
   }
 
   /*! \brief Domain of the memory profiling information */
-  profile::ProfileDomain domain_;
+  profiler::ProfileDomain domain_;
   /*! \brief Mutex for lazy init */
   std::mutex init_mutex_;
   /*! \brief Constant-sized vector of memory profile counters */
-  std::vector<std::shared_ptr<profile::ProfileCounter>> mem_counters_;
+  std::vector<std::shared_ptr<profiler::ProfileCounter>> mem_counters_;
 };
 
 #endif  // MXNET_USE_PROFILER

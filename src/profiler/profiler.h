@@ -32,7 +32,7 @@
 #include <mutex>
 #include <memory>
 #include <array>
-#include "../common/vtune.h"
+#include "profiler/vtune.h"
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__)
 #include <windows.h>
@@ -42,7 +42,7 @@ typedef uint32_t size_t;
 #endif
 
 namespace mxnet {
-namespace profile {
+namespace profiler {
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__)
 inline size_t current_process_id() { return ::GetCurrentProcessId(); }
@@ -477,7 +477,7 @@ struct ProfileDomain : public ProfileObject {
     : name_(name) {
     CHECK_NOTNULL(name);
     CHECK_NE(name[0], '\0');
-    VTUNE_ONLY_CODE(vtune_domain_.reset(new common::VTuneDomain(name)));
+    VTUNE_ONLY_CODE(vtune_domain_.reset(new vtune::VTuneDomain(name)));
   }
   /*!
    * \brief Get domain name
@@ -485,12 +485,12 @@ struct ProfileDomain : public ProfileObject {
    */
   const char *name() const { return name_.c_str(); }
   ProfileObjectType type() const override { return kDomain; }
-  VTUNE_ONLY_CODE(inline common::VTuneDomain *dom() { return vtune_domain_.get(); });
+  VTUNE_ONLY_CODE(inline vtune::VTuneDomain *dom() { return vtune_domain_.get(); });
  private:
   /*! \brief Name of the domain */
   profile_stat_string name_;
   /*! \brief VTune domain object */
-  VTUNE_ONLY_CODE(std::unique_ptr<common::VTuneDomain> vtune_domain_);
+  VTUNE_ONLY_CODE(std::unique_ptr<vtune::VTuneDomain> vtune_domain_);
 };
 
 /*!
@@ -507,7 +507,7 @@ struct ProfileCounter : public ProfileObject {
       , domain_(domain)
       , value_(0) {
     CHECK_NOTNULL(domain);
-    VTUNE_ONLY_CODE(vtune_.reset(new common::VTuneCounter(name, domain->dom())));
+    VTUNE_ONLY_CODE(vtune_.reset(new vtune::VTuneCounter(name, domain->dom())));
   }
   ~ProfileCounter() {}
   /*! \brief operator: ++object */
@@ -630,7 +630,7 @@ struct ProfileCounter : public ProfileObject {
   /*! \brief Value of the counter */
   std::atomic<uint64_t>  value_;
   /*! \brief VTune counter object */
-  VTUNE_ONLY_CODE(std::unique_ptr<common::VTuneCounter> vtune_);
+  VTUNE_ONLY_CODE(std::unique_ptr<vtune::VTuneCounter> vtune_);
 };
 
 class ProfileDuration : public ProfileObject {
@@ -675,7 +675,7 @@ struct ProfileTask : public ProfileDuration {
     CHECK_NOTNULL(domain);
     categories_.set(domain_->name());
     categories_.append(",task");
-    VTUNE_ONLY_CODE(vtune_task_.reset(new common::VTuneTask(name, domain->dom())));
+    VTUNE_ONLY_CODE(vtune_task_.reset(new vtune::VTuneTask(name, domain->dom())));
   }
 
   /*!
@@ -729,7 +729,7 @@ struct ProfileTask : public ProfileDuration {
   /*! \brief domain */
   ProfileDomain *domain_;
   /*! \brief VTune task object */
-  VTUNE_ONLY_CODE(std::unique_ptr<common::VTuneTask> vtune_task_);
+  VTUNE_ONLY_CODE(std::unique_ptr<vtune::VTuneTask> vtune_task_);
 
  protected:
   /*! \brief Task's start tick */
@@ -747,7 +747,7 @@ struct ProfileEvent  : public ProfileDuration {
   explicit inline ProfileEvent(const char *name)
     : name_(name)
       , categories_("event") {
-    VTUNE_ONLY_CODE(vtune_event_ = common::VTuneEvent::registry_.get(name));
+    VTUNE_ONLY_CODE(vtune_event_ = vtune::VTuneEvent::registry_.get(name));
   }
 
   /*!
@@ -803,7 +803,7 @@ struct ProfileEvent  : public ProfileDuration {
   /*! \brief Event categories (comma-delimited) */
   profile_stat_string categories_;
   /*! \brief VTune event object */
-  VTUNE_ONLY_CODE(common::VTuneEvent *vtune_event_);
+  VTUNE_ONLY_CODE(vtune::VTuneEvent *vtune_event_);
 
  protected:
   /*! \brief Start time of the event */
@@ -825,7 +825,7 @@ struct ProfileFrame : public ProfileDuration {
     CHECK_NOTNULL(domain);
     categories_.set(domain_->name());
     categories_.append(",frame");
-    VTUNE_ONLY_CODE(vtune_frame_.reset(new common::VTuneFrame(domain->dom())));
+    VTUNE_ONLY_CODE(vtune_frame_.reset(new vtune::VTuneFrame(domain->dom())));
   }
 
   /*!
@@ -875,7 +875,7 @@ struct ProfileFrame : public ProfileDuration {
   /*! \brief Pointer to the domain */
   ProfileDomain *domain_;
   /*! \brief VTune Frame object */
-  VTUNE_ONLY_CODE(std::unique_ptr<common::VTuneFrame> vtune_frame_);
+  VTUNE_ONLY_CODE(std::unique_ptr<vtune::VTuneFrame> vtune_frame_);
 
  protected:
   /*! \brief Frame start time */
@@ -908,7 +908,7 @@ struct ProfileInstantMarker {
     categories_.set(domain_->name());
     categories_.append(",instant_marker");
     VTUNE_ONLY_CODE(vtune_instant_marker_.reset(
-      new common::VTuneInstantMarker(name, domain->dom(), static_cast<__itt_scope>(scope))));
+      new vtune::VTuneInstantMarker(name, domain->dom(), static_cast<__itt_scope>(scope))));
   }
 
   /*!
@@ -977,7 +977,7 @@ struct ProfileInstantMarker {
   /*! \brief Whether this marker is nestabe */
   const bool nestable_;
   /*! \brief VTune instant marker object */
-  VTUNE_ONLY_CODE(std::unique_ptr<common::VTuneInstantMarker> vtune_instant_marker_);
+  VTUNE_ONLY_CODE(std::unique_ptr<vtune::VTuneInstantMarker> vtune_instant_marker_);
 };
 
 /*!

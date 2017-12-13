@@ -39,7 +39,7 @@
 #endif
 
 namespace mxnet {
-namespace profile {
+namespace profiler {
 
 ProfileDomain ProfileOperator::domain_("operator");
 
@@ -84,7 +84,7 @@ Profiler::Profiler()
     this->enable_output_ = true;
     // Since we want to avoid interfering with pure-VTune analylisys runs, for not set,
     // vtune will be recording based upon whether "Start" or "STart Paused" was selected
-    common::vtune_resume();
+    vtune::vtune_resume();
   }
 }
 
@@ -240,7 +240,7 @@ void Profiler::SetContinuousProfileDump(bool continuous_dump, float delay_in_sec
   if (continuous_dump) {
     this->append_profile_ = true;  // Continuous doesn't make sense without append mode
     DumpProfile(false);
-    std::shared_ptr<dmlc::ManagedThread> old_thread =
+    std::shared_ptr<dmlc::ThreadGroup::ManagedThread> old_thread =
       thread_group_->thread_by_name(TIMER_THREAD_NAME);
     if (old_thread && old_thread->is_shutdown_requested()) {
       // This should never happen unless someone is doing something malicious
@@ -268,7 +268,7 @@ void Profiler::SetContinuousProfileDump(bool continuous_dump, float delay_in_sec
         });
     }
   } else {
-    std::shared_ptr<dmlc::ManagedThread> old_thread =
+    std::shared_ptr<dmlc::ThreadGroup::ManagedThread> old_thread =
       thread_group_->thread_by_name(TIMER_THREAD_NAME);
     if (old_thread) {
       // Signal it to finish asynchronously
@@ -277,5 +277,5 @@ void Profiler::SetContinuousProfileDump(bool continuous_dump, float delay_in_sec
   }
 }
 
-}  // namespace profile
+}  // namespace profiler
 }  // namespace mxnet

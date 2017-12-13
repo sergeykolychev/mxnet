@@ -39,7 +39,7 @@
 #include <string>
 #include <thread>
 #include "./engine_impl.h"
-#include "./profiler.h"
+#include "../profiler/profiler.h"
 #include "./openmp.h"
 #include "../common/object_pool.h"
 
@@ -77,7 +77,7 @@ struct OprBlock : public common::ObjectPoolAllocatable<OprBlock> {
   /*! \brief indicate whether to profile this operator */
   bool profiling{false};
   /*! \brief operator execution statistics */
-  std::unique_ptr<profile::ProfileOperator> opr_profile;
+  std::unique_ptr<profiler::ProfileOperator> opr_profile;
   // define possible debug information
   DEFINE_ENGINE_DEBUG_INFO(OprBlock);
   /*!
@@ -326,7 +326,7 @@ class ThreadedEngine : public Engine {
 #if MXNET_USE_PROFILER
     if (opr_block->profiling && threaded_opr->opr_name) {
       const Context& ctx = opr_block->ctx;
-      opr_block->opr_profile.reset(new profile::ProfileOperator(threaded_opr->opr_name));
+      opr_block->opr_profile.reset(new profiler::ProfileOperator(threaded_opr->opr_name));
       opr_block->opr_profile->start(ctx.dev_type, ctx.dev_id);
     }
 #endif

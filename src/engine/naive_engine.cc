@@ -26,7 +26,7 @@
 #include <atomic>
 #include <thread>
 #include "./engine_impl.h"
-#include "./profiler.h"
+#include "../profiler/profiler.h"
 #include "./openmp.h"
 
 namespace mxnet {
@@ -44,7 +44,7 @@ class NaiveEngine final : public Engine {
     /*! \brief indicate whether to profile this operator */
     bool profiling{false};
     /*! \brief operator execution statistics */
-    std::unique_ptr<profile::ProfileOperator> opr_profile;
+    std::unique_ptr<profiler::ProfileOperator> opr_profile;
   };
 
   NaiveEngine() {
@@ -89,13 +89,13 @@ class NaiveEngine final : public Engine {
   }
 
   void Push(OprHandle op, Context exec_ctx, int priority = 0, bool profiling = false) override {
-    profile::Profiler *profiler = profile::Profiler::Get();
+    profiler::Profiler *profiler = profiler::Profiler::Get();
     NaiveOpr *opr = op->Cast<NaiveOpr>();
-    opr->profiling = profiling && (profiler->GetMode() & profile::Profiler::kSymbolic);
+    opr->profiling = profiling && (profiler->GetMode() & profiler::Profiler::kSymbolic);
     this->PushAsync([&](RunContext ctx, CallbackOnComplete on_complete) {
 #if MXNET_USE_PROFILER
         if (opr->profiling) {
-          opr->opr_profile.reset(new profile::ProfileOperator(opr->opr_name));
+          opr->opr_profile.reset(new profiler::ProfileOperator(opr->opr_name));
           opr->opr_profile->start(exec_ctx.dev_type, exec_ctx.dev_id);
         }
         opr->fn(ctx, on_complete);
@@ -125,16 +125,16 @@ class NaiveEngine final : public Engine {
         NaiveEngine::OnComplete, nullptr);
     this->req_completed_ = false;
 #if MXNET_USE_PROFILER
-    profile::Profiler *profiler = profile::Profiler::Get();
+    profiler::Profiler *profiler = profiler::Profiler::Get();
     NaiveOpr *opr = nullptr;
-    bool profiling = (profiler->GetState() == profile::Profiler::kRunning) &&
-                   (profiler->GetMode() & profile::Profiler::kImperative) &&
+    bool profiling = (profiler->GetState() == profiler::Profiler::kRunning) &&
+                   (profiler->GetMode() & profiler::Profiler::kImperative) &&
                    opr_name;
     if (profiling) {
       opr = NewOperator(exec_fun, const_vars, mutable_vars,
                         prop, opr_name)->Cast<NaiveOpr>();
       opr->profiling = profiling;
-      opr->opr_profile.reset(new profile::ProfileOperator(opr->opr_name));
+      opr->opr_profile.reset(new profiler::ProfileOperator(opr->opr_name));
       opr->opr_profile->start(exec_ctx.dev_type, exec_ctx.dev_id);
     }
 #endif

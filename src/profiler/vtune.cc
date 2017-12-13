@@ -19,11 +19,13 @@
 #include "./vtune.h"
 
 namespace mxnet {
-namespace common {
+namespace profiler {
+namespace vtune {
 
 #if MXNET_USE_VTUNE
 VTuneRegistry<VTuneEvent> VTuneEvent::registry_;
 #endif  // MXNET_USE_VTUNE
 
-}  // namespace common
+}  // namespace vtune
+}  // namespace profiler
 }  // namespace mxnet

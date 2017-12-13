@@ -38,7 +38,8 @@
 #endif
 
 namespace mxnet {
-namespace common {
+namespace profiler {
+namespace vtune {
 
 MSHADOW_CINLINE void vtune_pause() {
 #if MXNET_USE_VTUNE
@@ -57,6 +58,7 @@ struct VTunePause {
   MSHADOW_CINLINE VTunePause() {
     vtune_pause();
   }
+
   MSHADOW_CINLINE ~VTunePause() {
     vtune_resume();
   }
@@ -67,12 +69,14 @@ struct VTuneResume {
   MSHADOW_CINLINE VTuneResume() {
     vtune_resume();
   }
+
   MSHADOW_CINLINE ~VTuneResume() {
     vtune_pause();
   }
 };
 
 #if MXNET_USE_VTUNE
+
 /*
  * Intel VTune APIs. For API meanings, see:
  * https://software.intel.com/en-us/vtune-amplifier-help-instrumentation-and-tracing-technology-api-reference NOLINT()
@@ -84,9 +88,13 @@ class VTuneDomain {
     CHECK_NOTNULL(domain_);
     domain_->flags = 1;
   }
+
   inline operator __itt_domain *() { return domain_; }
+
   inline __itt_domain *dom() { return domain_; }
+
   inline const char *name() const { return domain_->nameA; }
+
  private:
   __itt_domain *domain_;
 };
@@ -163,9 +171,11 @@ class VTuneRegistry {
 class VTuneEvent {
  public:
   inline explicit VTuneEvent(const char *name) throw()
-  : itt_event_(__itt_event_create(name, strlen(name))) { }
+    : itt_event_(__itt_event_create(name, strlen(name))) {}
+
   inline void start() { __itt_event_start(itt_event_); }
-  inline void stop()  { __itt_event_end(itt_event_); }
+
+  inline void stop() { __itt_event_end(itt_event_); }
 
   static VTuneRegistry<VTuneEvent> registry_;
 
@@ -184,10 +194,15 @@ class VTuneTask {
     : name_(__itt_string_handle_create(name))
       , domain_(domain) {
   }
+
   inline void start() { __itt_task_begin(domain()->dom(), __itt_null, __itt_null, name_); }
-  inline void stop()  { __itt_task_end(domain()->dom()); }
+
+  inline void stop() { __itt_task_end(domain()->dom()); }
+
   inline VTuneDomain *domain() { return domain_; }
+
   const char *name() const { return name_->strA; }
+
  private:
   __itt_string_handle *name_;
   VTuneDomain *domain_;
@@ -200,25 +215,33 @@ class VTuneTask {
  */
 class VTuneFrame {
  public:
-  inline explicit VTuneFrame(VTuneDomain *domain) throw() : domain_(domain) {
+  inline explicit VTuneFrame(VTuneDomain *domain) throw()
+    : domain_(domain) {
     id_ = __itt_id_make(this, 0);
     __itt_id_create(domain->dom(), id_);
   }
+
   ~VTuneFrame() {
     __itt_id_destroy(domain_->dom(), id_);
   }
+
 #ifdef  MXNET_VTUNE_FRAME_GENERATE_ID
   inline void start() { __itt_frame_begin_v3(domain()->dom(), nullptr); }
   inline void stop()  { __itt_frame_end_v3(domain()->dom(), nullptr); }
 #else
+
   inline void start() { __itt_frame_begin_v3(domain()->dom(), &id_); }
-  inline void stop()  { __itt_frame_end_v3(domain()->dom(), &id_); }
+
+  inline void stop() { __itt_frame_end_v3(domain()->dom(), &id_); }
+
 #endif
+
   inline operator __itt_id *() { return &id_; }
+
   inline VTuneDomain *domain() { return domain_; }
 
  private:
-  __itt_id  id_;
+  __itt_id id_;
   VTuneDomain *domain_;
 };
 
@@ -235,22 +258,30 @@ class VTuneCounter {
       , counter_(__itt_counter_create(name, domain->name())) {
     CHECK_NOTNULL(counter_);
   }
+
   inline ~VTuneCounter() {
     __itt_counter_destroy(counter_);
   }
-  inline void operator ++() { __itt_counter_inc_delta(counter_, 1); }
-  inline void operator ++(int) { __itt_counter_inc_delta(counter_, 1); }
-  inline void operator --() { __itt_counter_dec_delta(counter_, 1); }
-  inline void operator --(int) { __itt_counter_dec_delta(counter_, 1); }
-  inline void operator +=(int64_t v) {
+
+  inline void operator++() { __itt_counter_inc_delta(counter_, 1); }
+
+  inline void operator++(int) { __itt_counter_inc_delta(counter_, 1); }
+
+  inline void operator--() { __itt_counter_dec_delta(counter_, 1); }
+
+  inline void operator--(int) { __itt_counter_dec_delta(counter_, 1); }
+
+  inline void operator+=(int64_t v) {
     if (v > 0) {
       __itt_counter_inc_delta(counter_, v);
     } else if (v < 0) {
       __itt_counter_dec_delta(counter_, v);
     }
   }
-  inline void operator -=(int64_t v) { this->operator+=(-v); }
-  inline VTuneCounter& operator = (uint64_t v) {
+
+  inline void operator-=(int64_t v) { this->operator+=(-v); }
+
+  inline VTuneCounter &operator=(uint64_t v) {
     __itt_counter_set_value(counter_, &v);
     return *this;
   }
@@ -274,7 +305,9 @@ class VTuneInstantMarker {
       , domain_(domain)
       , scope_(scope) {
   }
+
   void signal() { __itt_marker(domain_->dom(), __itt_null, name_, scope_); }
+
  private:
   __itt_string_handle *name_;
   VTuneDomain *domain_;
@@ -283,7 +316,8 @@ class VTuneInstantMarker {
 
 #endif  // MXNET_USE_VTUNE
 
-}  // namespace common
+}  // namespace vtune
+}  // namespace profiler
 }  // namespace mxnet
 
 #endif  // MXNET_COMMON_VTUNE_H_
