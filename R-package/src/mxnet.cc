@@ -24,8 +24,8 @@ void NotifyShutdown() {
   MX_CALL(MXNotifyShutdown());
 }
 
-void ProfilerSetConfig(int mode, const std::string &filename) {
-  MX_CALL(MXSetProfilerConfig(mode, filename.c_str()));
+void ProfilerSetConfig(const char *mode, const std::string &filename, bool append_mode) {
+  MX_CALL(MXSetProfilerConfig(mode, filename.c_str(), append_mode == 0));
 }
 
 void ProfilerSetState(int state) {

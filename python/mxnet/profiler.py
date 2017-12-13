@@ -23,7 +23,7 @@ from __future__ import absolute_import
 import ctypes
 from .base import _LIB, check_call, c_str, ProfileHandle
 
-def profiler_set_config(mode='symbolic', filename='profile.json'):
+def profiler_set_config(mode='symbolic', filename='profile.json', append_mode=True):
     """Set up the configure of profiler.
 
     Parameters
@@ -35,7 +35,9 @@ def profiler_set_config(mode='symbolic', filename='profile.json'):
     filename : string, optional
         The name of output trace file. Defaults to 'profile.json'.
     """
-    check_call(_LIB.MXSetProfilerConfig(c_str(mode), c_str(filename)))
+    check_call(_LIB.MXSetProfilerConfig(c_str(mode),
+                                        c_str(filename),
+                                        1 if append_mode is True else 0))
 
 def profiler_set_state(state='stop'):
     """Set up the profiler state to record operator.
@@ -131,13 +133,6 @@ def increment_counter(counter_handle, by_value):
 
 def decrement_counter(counter_handle, by_value):
     check_call(_LIB.MXProfileAdjustCounter(counter_handle, -int(by_value)))
-
-def set_append_mode(mode):
-    if mode is False:
-        mode = 0
-    else:
-        mode = 1
-    check_call(_LIB.MXSetDumpProfileAppendMode(int(mode)))
 
 def set_continuous_dump(continuous_dump=True, delay_in_seconds=1.0):
     if continuous_dump is False:

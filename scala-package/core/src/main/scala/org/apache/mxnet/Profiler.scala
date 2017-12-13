@@ -21,7 +21,6 @@ import org.apache.mxnet.Base._
 
 object Profiler {
 
-  val mode2Int = Map("symbolic" -> 0, "all" -> 1)
   val state2Int = Map("stop" -> 0, "run" -> 1)
 
   /**
@@ -32,9 +31,8 @@ object Profiler {
    * @param fileName, optional
    *                  The name of output trace file. Default is "profile.json".
    */
-  def profilerSetConfig(mode: String = "symbolic", fileName: String = "profile.json"): Unit = {
-    require(mode2Int.contains(mode))
-    checkCall(_LIB.mxSetProfilerConfig(mode2Int(mode), fileName))
+  def profilerSetConfig(mode: String = "symbolic", fileName: String = "profile.json", append_mode: Int = 0): Unit = {
+    checkCall(_LIB.mxSetProfilerConfig(mode, fileName, append_mode))
   }
 
   /**

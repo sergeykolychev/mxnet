@@ -1,8 +1,6 @@
 # profiler setting methods
-# 
+#
 
-#' @export
-MX.PROF.MODE <- list(SYMBOLIC = 0L, ALL = 1L)
 #' @export
 MX.PROF.STATE <- list(STOP = 0L, RUN = 1L)
 
@@ -12,8 +10,8 @@ MX.PROF.STATE <- list(STOP = 0L, RUN = 1L)
 #' @param filename The name of output trace file. Default is 'profile.json'
 #'
 #' @export
-mx.profiler.config <- function(mode = MX.PROF.MODE$SYMBOLIC, filename='profile.json') {
-	mx.internal.profiler.config(mode, filename)
+mx.profiler.config <- function(mode='symbolic', filename='profile.json', append_mode=0L) {
+	mx.internal.profiler.config(mode, filename, append_mode)
 }
 
 #' Set up the profiler state to record operator.

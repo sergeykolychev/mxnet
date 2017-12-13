@@ -215,9 +215,10 @@ MXNET_DLL int MXNotifyShutdown();
  * \brief Set up configuration of profiler
  * \param mode indicate the working mode of profiler
  * \param filename where to save trace file
+ * \param append_mode Whether DumpProfile() call should append to the same profile data file
  * \return 0 when success, -1 when failure happens.
  */
-MXNET_DLL int MXSetProfilerConfig(const char *mode, const char* filename);
+MXNET_DLL int MXSetProfilerConfig(const char *mode, const char* filename, int append_mode);
 /*!
  * \brief Set up state of profiler
  * \param state indicate the working state of profiler,
@@ -241,13 +242,6 @@ MXNET_DLL int MXDumpProfile();
  * \return 0 when success, -1 when failure happens.
  */
 MXNET_DLL int MXSetContinuousProfileDump(int continuous_dump, float delay_in_seconds);
-
-/*!
- * \brief Control whether to append profile data dumps to the output file or whether to truncate
- * \param append true to append subsequent MXDumpProfile() calls to the preexisting file
- * \return 0 when success, -1 when failure happens.
- */
-MXNET_DLL int MXSetDumpProfileAppendMode(int append);
 
 /*!
  * \brief Pause profiler tuning collection

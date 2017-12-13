@@ -251,12 +251,19 @@ class Profiler {
   inline ProfilerState GetState() const {
     return this->state_;
   }
-  /*! \brief set configure of profiler */
-  void SetConfig(int mode, std::string output_filename);
+  /*!
+   * \brief set profiler configuration
+   * \param mode flags, one or more of 'ProfilerMode'
+   * \param output_filename profile output file name
+   * \param append_mode true if profile information should be appended to the existing file
+   */
+  void SetConfig(int mode, std::string output_filename, bool append_mode);
+
   /*! \return mode of profiler */
   inline int GetMode() const {
     return this->mode_;
   }
+
   /*! \return whether the profiler is enabled to output */
   inline bool IsEnableOutput() const {
     return this->enable_output_;
@@ -266,12 +273,6 @@ class Profiler {
    * \param peform_cleanup Close off the json trace structures (ie last pass)
    */
   void DumpProfile(bool peform_cleanup = true);
-
-  /*!
-   * \brief Set whether calls to DumpProfile() should append or truncate the output file
-   * \param append true if profile information should be appended to the existing file
-   */
-  void SetDumpProfileAppendMode(bool append);
 
   /*!
    * \brief Set continuous asynchronous profile dump

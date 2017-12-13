@@ -21,7 +21,9 @@
 namespace mxnet {
 namespace common {
 
+#if MXNET_USE_VTUNE
 VTuneRegistry<VTuneEvent> VTuneEvent::registry_;
+#endif  // MXNET_USE_VTUNE
 
 }  // namespace common
 }  // namespace mxnet

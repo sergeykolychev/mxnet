@@ -230,7 +230,7 @@ struct ProfileInstantScopeParam : public dmlc::Parameter<ProfileInstantScopePara
 
 DMLC_REGISTER_PARAMETER(ProfileInstantScopeParam);
 
-int MXSetProfilerConfig(const char *mode, const char* filename) {
+int MXSetProfilerConfig(const char *mode, const char* filename, const int append_mode) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
@@ -238,7 +238,7 @@ int MXSetProfilerConfig(const char *mode, const char* filename) {
     std::vector<std::pair<std::string, std::string>> kwargs = {{ "mode", mode }};
     param.Init(kwargs);
     profile::Profiler::Get()->SetConfig(profile::Profiler::ProfilerMode(param.mode),
-                                        std::string(filename));
+                                        std::string(filename), append_mode != 0);
 #else
     warn_not_built_with_profiler_enabled();
 #endif
@@ -273,18 +273,6 @@ int MXSetProfilerState(int state) {
         break;
     }
     profile::Profiler::Get()->SetState(profile::Profiler::ProfilerState(state));
-#else
-    warn_not_built_with_profiler_enabled();
-#endif
-  API_END();
-}
-
-int MXSetDumpProfileAppendMode(int append) {
-  API_BEGIN();
-#if MXNET_USE_PROFILER
-    if ((append != 0) != profile::Profiler::Get()->append_mode()) {
-      profile::Profiler::Get()->SetDumpProfileAppendMode(append != 0);
-    }
 #else
     warn_not_built_with_profiler_enabled();
 #endif

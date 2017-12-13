@@ -115,10 +115,11 @@ void Profiler::SetState(ProfilerState state) {
   }
 }
 
-void Profiler::SetConfig(int mode, std::string output_filename) {
+void Profiler::SetConfig(int mode, std::string output_filename, bool append_mode) {
   std::lock_guard<std::recursive_mutex> lock{this->m_};
   this->mode_ = mode;
   this->filename_ = output_filename;
+  this->append_profile_ = append_mode;
   // Remove the output file to start
   if (!this->filename_.empty()) {
     ::unlink(this->filename_.c_str());
@@ -232,17 +233,12 @@ void Profiler::DumpProfile(bool peform_cleanup) {
                                                    // Otherwise, profiling stops.
 }
 
-void Profiler::SetDumpProfileAppendMode(bool append_mode) {
-  std::lock_guard<std::recursive_mutex> lock{this->m_};
-  append_profile_ = append_mode;
-}
-
 static constexpr char TIMER_THREAD_NAME[] = "DumpProfileTimer";
 
 void Profiler::SetContinuousProfileDump(bool continuous_dump, float delay_in_seconds) {
   std::lock_guard<std::recursive_mutex> lock{this->m_};
   if (continuous_dump) {
-    SetDumpProfileAppendMode(true);  // Continuous doesn't make sense without append mode
+    this->append_profile_ = true;  // Continuous doesn't make sense without append mode
     DumpProfile(false);
     std::shared_ptr<dmlc::ManagedThread> old_thread =
       thread_group_->thread_by_name(TIMER_THREAD_NAME);

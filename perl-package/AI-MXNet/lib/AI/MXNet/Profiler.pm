@@ -45,10 +45,9 @@ use AI::MXNet::Function::Parameters;
         'profile.json'.
 =cut
 
-method profiler_set_config(ProfilerMode $mode='symbolic', Str $filename='profile.json')
+method profiler_set_config(Str $mode='symbolic', Str $filename='profile.json', Int $append_mode=0)
 {
-    my %mode2int = qw/symbolic 0 all 1/;
-    check_call(AI::MXNet::SetProfilerConfig($mode2int{ $mode }, $filename));
+    check_call(AI::MXNet::SetProfilerConfig($mode, $filename, $append_mode));
 }
 
 =head2 profiler_set_state

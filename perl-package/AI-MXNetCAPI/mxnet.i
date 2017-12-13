@@ -265,9 +265,10 @@ int MXNotifyShutdown();
  *  record anly symbolic operator when mode == 0,
  *  record all operator when mode == 1
  * \param filename where to save trace file
+ * \param append_mode subsequent calls to MXDumpProfile() append to existing file
  * \return 0 when success, -1 when failure happens.
  */
-int MXSetProfilerConfig(int mode, const char* filename);
+int MXSetProfilerConfig(const char *mode, const char *filename, int append_mode);
 /*!
  * \brief Set up state of profiler
  * \param state indicate the working state of profiler,
