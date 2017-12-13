@@ -883,9 +883,9 @@ struct ProfileFrame : public ProfileDuration {
 };
 
 /*!
- * \brief Instant Marker
+ * \brief Marker - Mark an instance in time
  */
-struct ProfileInstantMarker {
+struct ProfileMarker {
   enum MarkerScope {  // Should equal VTune values
     kUnknown, kGlobal, kProcess, kThread, kTask, kMarker
   };
@@ -897,7 +897,7 @@ struct ProfileInstantMarker {
    * \param scope Scope of the instant marker
    * \param nestable true if the instant marker is nestable
    */
-  ProfileInstantMarker(const char *name,
+  ProfileMarker(const char *name,
                        ProfileDomain *domain,
                        const MarkerScope scope,
                        bool nestable = true)
@@ -914,7 +914,7 @@ struct ProfileInstantMarker {
   /*!
    * \brief Signal a marker at this instant
    */
-  void signal() {
+  void mark() {
     VTUNE_ONLY_CODE(vtune_instant_marker_->signal());
     SendStat();
   }
@@ -923,11 +923,11 @@ struct ProfileInstantMarker {
   /*!
    * \brief Instant-marker statistic object
    */
-  struct ProfileInstanceStat : public ProfileStat {
+  struct ProfileMarkerStat : public ProfileStat {
     enum InstantScope {
       kGlobal = 'g', kprocess = 'p', kThread = 't'
     };
-    explicit ProfileInstanceStat(const char *name, const char scope_char, bool nestable)
+    explicit ProfileMarkerStat(const char *name, const char scope_char, bool nestable)
     : scope_char_(scope_char) {
       items_[0].enabled_ = true;
       items_[0].event_type_ = nestable ? kAsyncNestableInstant : kInstant;
@@ -946,7 +946,7 @@ struct ProfileInstantMarker {
    * \brief Send this object's statistical datapoint to the profiler
    */
   virtual void SendStat() {
-    Profiler::Get()->AddNewProfileStat<ProfileInstanceStat>([this](ProfileInstanceStat *stat) {
+    Profiler::Get()->AddNewProfileStat<ProfileMarkerStat>([this](ProfileMarkerStat *stat) {
       stat->categories_.set(categories_.c_str());
     }, name_.c_str(), vtune_scope_to_chrome_scope(scope_), nestable_);
   }

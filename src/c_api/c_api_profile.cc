@@ -218,12 +218,12 @@ DMLC_REGISTER_PARAMETER(ProfileModeParam);
 struct ProfileInstantScopeParam : public dmlc::Parameter<ProfileInstantScopeParam> {
   int scope;
   DMLC_DECLARE_PARAMETER(ProfileInstantScopeParam) {
-    DMLC_DECLARE_FIELD(scope).set_default(profiler::ProfileInstantMarker::kProcess)
-      .add_enum("global", profiler::ProfileInstantMarker::kGlobal)
-      .add_enum("process", profiler::ProfileInstantMarker::kProcess)
-      .add_enum("thread", profiler::ProfileInstantMarker::kThread)
-      .add_enum("task", profiler::ProfileInstantMarker::kTask)
-      .add_enum("marker", profiler::ProfileInstantMarker::kMarker)
+    DMLC_DECLARE_FIELD(scope).set_default(profiler::ProfileMarker::kProcess)
+      .add_enum("global", profiler::ProfileMarker::kGlobal)
+      .add_enum("process", profiler::ProfileMarker::kProcess)
+      .add_enum("thread", profiler::ProfileMarker::kThread)
+      .add_enum("task", profiler::ProfileMarker::kTask)
+      .add_enum("marker", profiler::ProfileMarker::kMarker)
       .describe("Profile Instant-Marker scope.");
   }
 };
@@ -521,11 +521,11 @@ int MXProfileSetInstantMarker(ProfileHandle domain,
     ProfileInstantScopeParam param;
     std::vector<std::pair<std::string, std::string>> kwargs = {{ "scope", scope }};
     param.Init(kwargs);
-    profiler::ProfileInstantMarker marker(instant_marker_name,
+    profiler::ProfileMarker marker(instant_marker_name,
                                          static_cast<profiler::ProfileDomain *>(domain),
-                                         static_cast<profiler::ProfileInstantMarker::MarkerScope>(
+                                         static_cast<profiler::ProfileMarker::MarkerScope>(
                                            param.scope));
-    marker.signal();
+    marker.mark();
 #else
     warn_not_built_with_profiler_enabled();
 #endif
