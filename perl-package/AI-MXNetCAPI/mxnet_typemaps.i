@@ -112,6 +112,32 @@
     }
 }
 
+%typemap(in,numinputs=0) (const int **out_stypes) (int* temp)
+{
+    temp = NULL;
+    $1 = &temp;
+}
+
+%typemap(argout) (const int **out_stypes)
+{
+    if(av_len((AV*)SvRV(ST(3))) == -1 && !result)
+    {
+        AV *myav;
+        SV **svs;
+        int i = 0;
+        svs = (SV **)safemalloc(*arg4*sizeof(SV *));
+        for (i = 0; i < *arg4 ; i++) {
+            svs[i] = newSViv((*$1)[i]);
+            sv_2mortal(svs[i]);
+        }
+        myav = av_make(*arg4, svs);
+        Safefree(svs);
+        $result = newRV_noinc((SV*)myav);
+        sv_2mortal($result);
+        argvi++;
+    }
+}
+
 %typemap(in,numinputs=0) (nn_uint *out_size, const char ***out_array) (nn_uint temp_size, char** temp),
                          (mx_uint *out_size, const char ***out_array) (mx_uint temp_size, char** temp)
 {
@@ -131,7 +157,7 @@
         for (i = 0; i < *$1 ; i++) {
             svs[i] = newSVpv((*$2)[i],0);
             sv_2mortal(svs[i]);
-        };
+        }
         myav = av_make(*$1,svs);
         Safefree(svs);
         $result = newRV_noinc((SV*)myav);
@@ -157,7 +183,7 @@
         for (i = 0; i < *$1*2 ; i++) {
             svs[i] = newSVpv((*$2)[i],0);
             sv_2mortal(svs[i]);
-        };
+        }
         myav = av_make(*$1*2,svs);
         Safefree(svs);
         $result = newRV_noinc((SV*)myav);
@@ -284,7 +310,7 @@
        $1 = NULL;
     }
 }
-%typemap(freearg) (NDArrayHandle* in), (SymbolHandle* in)  {
+%typemap(freearg) (NDArrayHandle* in), (SymbolHandle* in) {
     Safefree($1);
 }
 
@@ -1088,6 +1114,11 @@
 %typemap(in,numinputs=0) (MXKVStoreUpdater* updater)
 {
     $1 = KVStore_callback;
+}
+
+%typemap(in,numinputs=0) (MXKVStoreStrUpdater* updater)
+{
+    $1 = KVStoreStr_callback;
 }
 
 %typemap(in,numinputs=0) (MXKVStoreServerController* controller)

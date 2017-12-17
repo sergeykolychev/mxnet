@@ -76,5 +76,6 @@ subtype "Activation"      => as "AI::MXNet::Symbol|Str|CodeRef";
 subtype "SymbolOrArrayOfSymbols" => as "AI::MXNet::Symbol|ArrayRef[AI::MXNet::Symbol]";
 subtype "NameShapeOrDataDesc" => as "NameShape|AI::MXNet::DataDesc";
 subtype "AdvancedSlice"   => as "ArrayRef[ArrayRef|PDL|PDL::Matrix|AI::MXNet::NDArray]";
+subtype "InternalSlice"   => as enum([qw[begin end step]]);
 
 1;
