@@ -47,6 +47,8 @@ use AI::MXNet::Contrib;
 use AI::MXNet::CachedOp;
 use AI::MXNet::AutoGrad;
 use AI::MXNet::Gluon;
+use AI::MXNet::NDArray::Sparse;
+use AI::MXNet::Symbol::Sparse;
 our $VERSION = '1.1';
 
 sub import

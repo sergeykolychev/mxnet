@@ -19,21 +19,26 @@ package AI::MXNet::Base;
 use strict;
 use warnings;
 use PDL;
-use PDL::Types qw();
+use PDL::Types ();
+use PDL::CCS::Nd;
 use AI::MXNetCAPI 1.1;
 use AI::NNVMCAPI 1.1;
 use AI::MXNet::Types;
 use Time::HiRes;
+use Scalar::Util qw(blessed);
 use Carp;
 use Exporter;
 use base qw(Exporter);
 use List::Util qw(shuffle);
 
-@AI::MXNet::Base::EXPORT = qw(product enumerate assert zip check_call build_param_doc
-                              pdl cat dog svd bisect_left pdl_shuffle as_array
+@AI::MXNet::Base::EXPORT = qw(product enumerate assert zip check_call build_param_doc pdlccs_shuffle
+                              pdl cat dog svd bisect_left pdl_shuffle as_array ascsr rand_sparse
                               DTYPE_STR_TO_MX DTYPE_MX_TO_STR DTYPE_MX_TO_PDL
-                              DTYPE_PDL_TO_MX DTYPE_MX_TO_PERL GRAD_REQ_MAP);
-@AI::MXNet::Base::EXPORT_OK = qw(pzeros pceil);
+                              DTYPE_PDL_TO_MX DTYPE_MX_TO_PERL GRAD_REQ_MAP
+                              STORAGE_TYPE_UNDEFINED STORAGE_TYPE_DEFAULT
+                              STORAGE_TYPE_ROW_SPARSE STORAGE_TYPE_CSR
+                              STORAGE_TYPE_STR_TO_ID STORAGE_TYPE_ID_TO_STR STORAGE_AUX_TYPES);
+@AI::MXNet::Base::EXPORT_OK = qw(pzeros pceil pones);
 
 use constant DTYPE_STR_TO_MX => {
     float32 => 0,
@@ -97,6 +102,29 @@ use constant GRAD_REQ_MAP => {
     write => 1,
     add   => 3
 };
+use constant {
+    STORAGE_TYPE_UNDEFINED  => -1,
+    STORAGE_TYPE_DEFAULT    =>  0,
+    STORAGE_TYPE_ROW_SPARSE =>  1,
+    STORAGE_TYPE_CSR        =>  2
+};
+use constant STORAGE_TYPE_STR_TO_ID => {
+    undefined  => STORAGE_TYPE_UNDEFINED,
+    default    => STORAGE_TYPE_DEFAULT,
+    row_sparse => STORAGE_TYPE_ROW_SPARSE,
+    csr        => STORAGE_TYPE_CSR
+};
+use constant STORAGE_TYPE_ID_TO_STR => {
+    STORAGE_TYPE_UNDEFINED()  => 'undefined',
+    STORAGE_TYPE_DEFAULT()    => 'default',
+    STORAGE_TYPE_ROW_SPARSE() => 'row_sparse',
+    STORAGE_TYPE_CSR()        => 'csr'
+};
+use constant STORAGE_AUX_TYPES => {
+    row_sparse => ['int64'],
+    csr => ['int64', 'int64']
+};
+
 
 =head1 NAME
 
@@ -211,6 +239,31 @@ sub pdl_shuffle
     }
     $c;
 }
+
+=head2 pdlccs_shuffle
+
+    Shuffle the two dimensional PDL::CCS::Nd by the last dimension
+
+    Parameters
+    -----------
+    PDL::CCS::Nd $pdl
+    $preshuffle Maybe[ArrayRef[Index]], if defined the array elements are used
+    as shuffled last dimension's indexes
+=cut
+
+
+sub pdlccs_shuffle
+{
+    my ($pdl, $preshuffle) = @_;
+    my $c = $pdl->copy;
+    my @shuffle = $preshuffle ? @{ $preshuffle } : shuffle(0..$pdl->dim(-1)-1);
+    for my $i (0..$pdl->dim(-1)-1)
+    {
+        $c->indexND(pdl([map { [$_, $i] } 0..$pdl->dim(0)-1])) .= $pdl->indexND(pdl([map { [$_, $shuffle[$i]] } 0..$pdl->dim(0)-1]))
+    }
+    $c;
+}
+
 
 =head2 assert
 
@@ -348,10 +401,76 @@ END {
 }
 
 *pzeros = \&zeros;
+*pones = \&ones;
 *pceil  = \&ceil;
 ## making sure that we can stringify arbitrarily large piddles
 $PDL::toolongtoprint = 1000_000_000;
 ## convenience subs
+
+sub ascsr
+{
+    my ($data, $indptr, $indices, $shape) = @_;
+    my @which;
+    my $i = 0;
+    my $j = 0;
+    while($i < $indices->nelem)
+    {
+        for($i = $indptr->at($j); $i < $indptr->at($j+1); $i++)
+        {
+            push @which, [$j, $indices->at($i)];
+        }
+        $j++;
+    }
+    return PDL::CCS::Nd->newFromWhich(
+            pdl(\@which), $data, pdims => blessed $shape ? $shape : pdl($shape)
+    )->xchg(0, 1);
+}
+
+package AI::MXNet::COO::Nd;
+use Mouse;
+has ['data', 'row', 'col'] => (is => 'rw');
+no Mouse;
+
+package AI::MXNet::Base;
+
+sub tocoo
+{
+    my $csr = shift;
+    return AI::MXNet::COO::Nd->new(
+        data => $csr->data,
+        row  => $csr->_whichND->slice(0)->flat,
+        col  => $csr->_whichND->slice(1)->flat
+    );
+}
+
+sub rand_sparse
+{
+    my ($num_rows, $num_cols, $density, $dtype, $format) = @_;
+    $dtype  //= 'float32';
+    $format //= 'csr';
+    my $pdl_type = PDL::Type->new(DTYPE_MX_TO_PDL->{ $dtype });
+    my $dense = random($pdl_type, $num_cols, $num_rows);
+    my $missing = 0;
+    $dense->where(random($num_cols, $num_rows)<=1-$density) .= $missing;
+    if($format eq 'csr')
+    {
+        return $dense->tocsr;
+    }
+    return $dense;
+}
+
+{
+    no warnings 'once';
+    *PDL::CCS::Nd::data    = sub { shift->_nzvals };
+    *PDL::CCS::Nd::indptr  = sub { my $self = shift; ($self->hasptr ? $self->getptr : $self->ptr)[0] };
+    *PDL::CCS::Nd::indices = sub { shift->_whichND->slice(1)->flat };
+    *PDL::CCS::Nd::tocoo   = sub { tocoo(shift) };
+    *PDL::CCS::Nd::shape   = sub { shift->pdims };
+    *PDL::CCS::Nd::dtype   = sub { DTYPE_MX_TO_STR->{ DTYPE_PDL_TO_MX->{ shift->type->numval } } };
+    *PDL::tocsr            = sub { shift->xchg(0, 1)->toccs->xchg(0, 1) };
+    *PDL::rand_sparse      = sub { shift; rand_sparse(@_) };
+}
+
 {
     my $orig_at = PDL->can('at');
     no warnings 'redefine';
