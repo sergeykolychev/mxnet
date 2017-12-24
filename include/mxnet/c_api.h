@@ -315,7 +315,7 @@ MXNET_DLL int MXProfileDestroyHandle(ProfileHandle frame_handle);
 MXNET_DLL int MXProfileDurationStart(ProfileHandle duration_handle);
 
 /*!
- * \brief Stoptiming the duration of a profile duration object such as an event, task or frame
+ * \brief Stop timing the duration of a profile duration object such as an event, task or frame
  * \param duration_handle handle to the duration object
  * \return 0 when success, -1 when failure happens.
  */
