@@ -19,7 +19,8 @@ package AI::MXNet::Base;
 use strict;
 use warnings;
 use PDL;
-use PDL::Types qw();
+use PDL::Types ();
+use PDL::CCS::Nd;
 use AI::MXNetCAPI 1.1;
 use AI::NNVMCAPI 1.1;
 use AI::MXNet::Types;
@@ -30,7 +31,7 @@ use base qw(Exporter);
 use List::Util qw(shuffle);
 
 @AI::MXNet::Base::EXPORT = qw(product enumerate assert zip check_call build_param_doc
-                              pdl cat dog svd bisect_left pdl_shuffle as_array
+                              pdl cat dog svd bisect_left pdl_shuffle as_array ascsr rand_sparse
                               DTYPE_STR_TO_MX DTYPE_MX_TO_STR DTYPE_MX_TO_PDL
                               DTYPE_PDL_TO_MX DTYPE_MX_TO_PERL GRAD_REQ_MAP
                               STORAGE_TYPE_UNDEFINED STORAGE_TYPE_DEFAULT
@@ -378,6 +379,52 @@ END {
 ## making sure that we can stringify arbitrarily large piddles
 $PDL::toolongtoprint = 1000_000_000;
 ## convenience subs
+
+sub ascsr
+{
+    my ($data, $indptr, $indices, $shape) = @_;
+    my @which;
+    my $i = 0;
+    my $j = 0;
+    while($i < $indices->nelem)
+    {
+        for($i = $indptr->at($j); $i < $indptr->at($j+1); $i++)
+        {
+            push @which, [$j, $indices->at($i)];
+        }
+        $j++;
+    }
+    return PDL::CCS::Nd->newFromWhich(
+            pdl(\@which), $data, pdims => blessed $shape ? $shape : pdl($shape)
+    )->xchg(0, 1);
+}
+
+sub rand_sparse
+{
+    my ($num_rows, $num_cols, $density, $dtype, $format) = @_;
+    $dtype  //= 'float32';
+    $format //= 'csr';
+    my $pdl_type = PDL::Type->new(DTYPE_MX_TO_PDL->{ $dtype });
+    my $dense = random($pdl_type, $num_cols, $num_rows);
+    my $missing = 0;
+    $dense->where(random($num_cols, $num_rows)<=1-$density) .= $missing;
+    if($format eq 'csr')
+    {
+        return $dense->tocsr;
+    }
+    return $dense;
+}
+
+{
+    no warnings 'once';
+    *PDL::CCS::Nd::data    = sub { shift->_nzvals };
+    *PDL::CCS::Nd::indptr  = sub { my $self = shift; ($self->hasptr ? $self->getptr : $self->ptr)[0] };
+    *PDL::CCS::Nd::indices = sub { shift->_whichND->slice(1)->flat };
+    *PDL::tocsr            = sub { shift->xchg(0, 1)->toccs->xchg(0, 1) };
+    *PDL::CCS::Nd::shape   = sub { shift->pdims };
+    *PDL::rand_sparse      = sub { shift; rand_sparse(@_) };
+}
+
 {
     my $orig_at = PDL->can('at');
     no warnings 'redefine';

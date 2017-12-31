@@ -1417,10 +1417,21 @@ method _new_from_shared_mem($shared_pid, $shared_id, $shape, $dtype)
     return $hdl;
 }
 
-method _storage_type($handle)
+=head2 tostype
+
+        Return a copy of the array with chosen storage type.
+
+        Returns
+        -------
+        AI::MXNet::NDArray or AI::MXNet::NDArray::CSR or AI::MXNet::NDArray::RowSparse
+            A copy of the array with the chosen storage stype
+=cut
+
+method tostype(Stype $stype)
 {
-    scalar(check_call(AI::MXNetCAPI::NDArrayGetStorageType($handle, 0)));
+    return $self->cast_storage(stype => $stype);
 }
+
 
 =head2 waitall
 

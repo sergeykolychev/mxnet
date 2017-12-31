@@ -191,31 +191,6 @@ method copyto(AI::MXNet::NDArray|AI::MXNet::Context $other)
     }
 }
 
-method _ndarray_cls($handle, $writable=1, $stype=STORAGE_TYPE_UNDEFINED)
-{
-    if($stype eq STORAGE_TYPE_UNDEFINED)
-    {
-        $stype = __PACKAGE__->_storage_type($handle);
-    }
-    if($stype eq STORAGE_TYPE_DEFAULT)
-    {
-        return AI::MXNet::NDArray->new(handle => $handle, writable => $writable);
-    }
-    elsif($stype eq STORAGE_TYPE_CSR)
-    {
-        return AI::MXNet::NDArray::CSR->new(handle => $handle, writable => $writable);
-    }
-    elsif($stype eq STORAGE_TYPE_ROW_SPARSE)
-    {
-        return AI::MXNet::NDArray::RowSparse->new(handle => $handle, writable => $writable);
-    }
-    else
-    {
-        confess("unknown storage type: $stype");
-    }
-}
-
-
 =head2 check_format
 
         Check whether the NDArray format is valid.
