@@ -26,12 +26,6 @@
 #define MXNET_OPERATOR_RANDOM_SAMPLER_H_
 
 #include <algorithm>
-#include "../../engine/openmp.h"
-
-#ifdef __CUDACC__
-#include <curand.h>
-#include <curand_kernel.h>
-#endif  // __CUDACC__
 
 using namespace mshadow;
 using namespace mxnet::op::mxnet_op;
@@ -55,67 +49,6 @@ inline static void LaunchRNG(mshadow::Stream<xpu> *s,
   const int nthread = std::min(nloop, RandGenerator<xpu>::kNumRandomStates);
   const int step = (N + nthread - 1) / nthread;
   Kernel<OP, xpu>::Launch(s, nthread, *gen, N, step, args...);
-}
-
-// Elementary random number generation for int/uniform/gaussian in CPU and GPU.
-// Will use float data type whenever instantiated for half_t or any other non
-// standard real type.
-template<typename xpu, typename DType>
-class RandGenerator;
-
-template<typename DType>
-class RandGenerator<cpu, DType> {
- public:
-  typedef typename std::conditional<std::is_floating_point<DType>::value,
-                                    DType, float>::type FType;
-  std::mt19937 engine;
-  std::uniform_real_distribution<FType> uniformNum;
-  std::normal_distribution<FType> normalNum;
-  explicit RandGenerator(unsigned int seed): engine(seed) {}
-  MSHADOW_XINLINE int rand() { return engine(); }
-  MSHADOW_XINLINE FType uniform() { return uniformNum(engine); }
-  MSHADOW_XINLINE FType normal() { return normalNum(engine); }
-};
-
-#ifdef __CUDACC__
-
-// uniform number generation in Cuda made consistent with stl (include 0 but exclude 1)
-// by using 1.0-curand_uniform(). Needed as some samplers below won't be able to deal with
-// one of the boundary cases.
-template<typename DType>
-class RandGenerator<gpu, DType> {
- public:
-  curandState_t state;
-  __device__ RandGenerator(unsigned int seed) { curand_init(seed, 0, 0, &state); }
-  MSHADOW_FORCE_INLINE __device__ int rand() { return curand(&state); }
-  MSHADOW_FORCE_INLINE __device__ float uniform()
-                              { return static_cast<float>(1.0) - curand_uniform(&state); }
-  MSHADOW_FORCE_INLINE __device__ float normal() { return curand_normal(&state); }
-};
-
-template<>
-class RandGenerator<gpu, double> {
- public:
-  curandState_t state;
-  __device__ RandGenerator(unsigned int seed) { curand_init(seed, 0, 0, &state); }
-  MSHADOW_FORCE_INLINE __device__ int rand() { return curand(&state); }
-  MSHADOW_FORCE_INLINE __device__ double uniform()
-                            { return static_cast<double>(1.0) - curand_uniform_double(&state); }
-  MSHADOW_FORCE_INLINE __device__ double normal() { return curand_normal_double(&state); }
-};
-
-#endif  // __CUDACC__
-
-// Number of seeds/threads when sampling on cpu/gpu.
-template<typename xpu>
-MSHADOW_XINLINE index_t OptSampleSeedNum(index_t N);
-template<>
-MSHADOW_CINLINE index_t OptSampleSeedNum<cpu>(index_t N) {
-  return engine::OpenMP::Get()->GetRecommendedOMPThreadCount();
-}
-template<>
-MSHADOW_XINLINE index_t OptSampleSeedNum<gpu>(index_t N) {
-  return N;
 }
 
 #define RNG_KERNEL_LOOP(xpu, GType, thread_id, gen, N, step, ...)        \
