@@ -1003,7 +1003,8 @@ method zeros(
     Dtype :$dtype='float32',
     Maybe[AI::MXNet::NDArray] :$out=,
     Maybe[Str] :$name=,
-    Maybe[Str] :$__layout__=
+    Maybe[Str] :$__layout__=,
+    Stype :$stype='default'
 )
 {
     return __PACKAGE__->_zeros({ shape => $shape, ctx => "$ctx", dtype => $dtype, ($out ? (out => $out) : ())  });
@@ -1579,5 +1580,6 @@ EOV
 
 sub contrib { 'AI::MXNet::Contrib::NDArray' }
 sub random  { 'AI::MXNet::Random' }
+sub sparse  { 'AI::MXNet::NDArray::Sparse' }
 
 __PACKAGE__->meta->make_immutable;

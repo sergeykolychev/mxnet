@@ -114,10 +114,10 @@ use constant STORAGE_TYPE_STR_TO_ID => {
     csr        => STORAGE_TYPE_CSR
 };
 use constant STORAGE_TYPE_ID_TO_STR => {
-    STORAGE_TYPE_UNDEFINED  => 'undefined',
-    STORAGE_TYPE_DEFAULT    => 'default',
-    STORAGE_TYPE_ROW_SPARSE => 'row_sparse',
-    STORAGE_TYPE_CSR        => 'csr'
+    STORAGE_TYPE_UNDEFINED()  => 'undefined',
+    STORAGE_TYPE_DEFAULT()    => 'default',
+    STORAGE_TYPE_ROW_SPARSE() => 'row_sparse',
+    STORAGE_TYPE_CSR()        => 'csr'
 };
 use constant STORAGE_AUX_TYPES => {
     row_sparse => ['int64'],

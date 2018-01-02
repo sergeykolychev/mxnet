@@ -211,6 +211,11 @@ method _storage_type($handle)
     scalar(check_call(AI::MXNetCAPI::NDArrayGetStorageType($handle)));
 }
 
+method stype()
+{
+    return STORAGE_TYPE_ID_TO_STR->{ __PACKAGE__->_storage_type($self->handle) };
+}
+
 method _init_ndarray_module()
 {
     my $op_names = check_call(AI::MXNetCAPI::ListAllOpNames());

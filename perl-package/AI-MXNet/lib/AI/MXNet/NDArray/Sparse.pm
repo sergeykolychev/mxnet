@@ -15,7 +15,7 @@
 # specific language governing permissions and limitations
 # under the License.
 
-package AI::MXNet::NDArray::Sparse::Base;
+package AI::MXNet::NDArray::Sparse;
 use strict;
 use warnings;
 use AI::MXNet::Base;
@@ -26,11 +26,6 @@ extends 'AI::MXNet::NDArray';
 =head1 NAME
 
     AI::MXNet::NDArray::Sparse - Sparse NDArray API of MXNet
-=cut
-
-=head1 NAME
-
-    AI::MXNet::NDArray::Sparse::Base
 =cut
 
 =head1 DESCRIPTION
@@ -224,7 +219,7 @@ method _data()
 =head2 _aux_data
 
         Get a deep copy NDArray of the i-th aux data array associated with the
-        AI::MXNet::NDArray::Sparse::Base
+        AI::MXNet::NDArray::Sparse
 
         This function blocks. Do not use it in performance critical code.
 =cut
@@ -238,7 +233,7 @@ method _aux_data(Int $i)
 
 package AI::MXNet::NDArray::CSR;
 use Mouse;
-extends 'AI::MXNet::NDArray::Sparse::Base';
+extends 'AI::MXNet::NDArray::Sparse';
 
 =head1 NAME
 
@@ -523,7 +518,7 @@ sub ascsr
 
 package AI::MXNet::NDArray::RowSparse;
 use Mouse;
-extends 'AI::MXNet::NDArray::Sparse::Base';
+extends 'AI::MXNet::NDArray::Sparse';
 
 =head1 NAME
 
@@ -714,7 +709,7 @@ method copyto(AI::MXNet::Context|AI::MXNet::NDArray $other)
     }
 }
 
-package AI::MXNet::NDArray::Sparse::Base;
+package AI::MXNet::NDArray::Sparse;
 
 # Prepare `source_array` so that it can be used to construct NDArray.
 # `source_array` is converted to a `pdl` if it's neither an `NDArray`
@@ -927,15 +922,15 @@ method _csr_matrix_from_definition(
 
     if(not (blessed $data and $data->isa('AI::MXNet::NDArray')))
     {
-        $data = __PACKAGE__->_array($data, $ctx, $dtype);
+        $data = __PACKAGE__->_array($data, ctx => $ctx, dtype => $dtype);
     }
     if(not (blessed $indptr and $indptr->isa('AI::MXNet::NDArray')))
     {
-        $indptr = __PACKAGE__->_array($indptr, $ctx, $indptr_type);
+        $indptr = __PACKAGE__->_array($indptr, ctx => $ctx, dtype => $indptr_type);
     }
     if(not (blessed $indices and $indices->isa('AI::MXNet::NDArray')))
     {
-        $indices = __PACKAGE__->_array($indices, $ctx, $indices_type);
+        $indices = __PACKAGE__->_array($indices, ctx => $ctx, dtype => $indices_type);
     }
     if(not defined $shape)
     {
@@ -1078,6 +1073,7 @@ method row_sparse_array(
         }
     }
 }
+use Data::Dumper;
 
 # Create a AI::MXNet::NDArray::RowSparse based on data and indices
 method _row_sparse_ndarray_from_definition(
@@ -1085,22 +1081,28 @@ method _row_sparse_ndarray_from_definition(
     Maybe[Shape] :$shape=,
     AI::MXNet::Context :$ctx=AI::MXNet::Context->current_ctx,
     Maybe[Dtype] :$dtype=,
-    Maybe[Dtype] :$indices_type=STORAGE_AUX_TYPES->{'row_parse'}[0]
+    Maybe[Dtype] :$indices_type=STORAGE_AUX_TYPES->{'row_sparse'}[0]
 )
 {
     $dtype = __PACKAGE__->_prepare_default_dtype($data, $dtype);
     # prepare src array and types
+warn Dumper [$data, $indices];
+print $data;
+print $indices;
     $data = __PACKAGE__->_prepare_src_array($data, $dtype);
     $indices = __PACKAGE__->_prepare_src_array($indices, $indices_type);
+warn Dumper [$data, $indices];
 
     if(not (blessed $data and $data->isa('AI::MXNet::NDArray')))
     {
-        $data = __PACKAGE__->_array($data, $ctx, $dtype);
+        $data = __PACKAGE__->_array($data, ctx => $ctx, dtype => $dtype);
     }
     if(not (blessed $indices and $indices->isa('AI::MXNet::NDArray')))
     {
-        $indices = __PACKAGE__->_array($indices, $ctx, $indices_type);
+        $indices = __PACKAGE__->_array($indices, ctx => $ctx, dtype => $indices_type);
     }
+warn Dumper [$data, $indices];
+
     if(not defined $shape)
     {
         my $num_indices = $indices->shape->[0];
@@ -1112,6 +1114,7 @@ method _row_sparse_ndarray_from_definition(
         $shape = [$dim0, @{ $data->shape } [1..@{ $data->shape } - 1]];
     }
     # verify shapes
+warn Dumper [$data, $indices];
     if($data->ndim != @{ $shape } or $indices->ndim != 1 or product(@{ $shape } [1..@{ $shape } - 1]) == 0)
     {
         confess("invalid shape");
@@ -1254,13 +1257,17 @@ method empty(
     <AI::MXNet::NDArray::RowSparse 3x2 @cpu(0)>
 =cut
 
-method array(
-    AI::MXNet::NDarray::CSR|AI::MXNet::RowSparse|PDL::CCS::Nd $source_array,
+method _array(
+    AcceptableInput $source_array,
     Maybe[AI::MXNet::Context] :$ctx=AI::MXNet::Context->current_ctx,
-    Maybe[Dtype] :$dtype=
+    Maybe[Dtype] :$dtype='float32'
 )
 {
-    if($source_array->isa('AI::MXNet::NDarray'))
+    if(not blessed $source_array or $source_array->isa('PDL'))
+    {
+        $source_array = __PACKAGE__->array($source_array, ctx => $ctx, dtype => $dtype);
+    }
+    if($source_array->isa('AI::MXNet::NDArray'))
     {
         assert(
             ($source_array->stype ne 'default'),

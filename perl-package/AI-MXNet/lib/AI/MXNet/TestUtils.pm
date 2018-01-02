@@ -28,7 +28,8 @@ use Exporter;
 use base qw(Exporter);
 @AI::MXNet::TestUtils::EXPORT_OK = qw(same reldiff almost_equal GetMNIST_ubyte
                                       GetCifar10 pdl_maximum pdl_minimum mlp2 conv
-                                      check_consistency zip assert enumerate same_array dies_like allclose);
+                                      check_consistency zip assert enumerate same_array dies_like allclose rand_shape_2d
+                                      rand_sparse_ndarray random_arrays);
 use constant default_numerical_threshold => 1e-6;
 =head1 NAME
 
@@ -360,32 +361,7 @@ func check_consistency(
     }
     return $gt;
 }
-=head
-sub zip
-{
-    my ($sub, @arrays) = @_;
-    my $len = @{ $arrays[0] };
-    for (my $i = 0; $i < $len; $i++)
-    {
-        $sub->(map { $_->[$i] } @arrays);
-    }
-}
 
-sub enumerate
-{
-    my ($sub, @arrays) = @_;
-    my $len = @{ $arrays[0] };
-    zip($sub, [0..$len-1], @arrays);
-}
-
-sub assert
-{
-    my ($input, $error_str) = @_;
-    local($Carp::CarpLevel) = 1;
-    Carp::confess($error_str//'AssertionError')
-        unless $input;
-}
-=cut
 =head2 same_array
 
     Check whether two NDArrays sharing the same memory block
