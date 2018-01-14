@@ -35,11 +35,11 @@ extends 'AI::MXNet::NDArray';
 =cut
 
 method _new_alloc_handle(
-    StorageType              $stype,
+    Stype                    $stype,
     Shape                    $shape,
     AI::MXNet::Context       $ctx,
     Bool                     $delay_alloc,
-    Dype                     $dtype,
+    Dtype                    $dtype,
     AuxTypes                 $aux_types,
     Maybe[ArrayRef[Shape]]   $aux_shapes=
 )
@@ -1035,6 +1035,8 @@ method row_sparse_array(
             }
             else
             {
+                use Data::Dumper;
+                warn Dumper([@{ $arg1 }, shape => $shape, ctx => $ctx, dtype => $dtype]);
                 # data, indices, indptr
                 return __PACKAGE__->_row_sparse_ndarray_from_definition(
                     @{ $arg1 }, shape => $shape, ctx => $ctx, dtype => $dtype
@@ -1120,7 +1122,7 @@ warn Dumper [$data, $indices];
         confess("invalid shape");
     }
     my $handle = __PACKAGE__->_new_alloc_handle(
-        'row_parse', $shape, $ctx, 0, $dtype,
+        'row_sparse', $shape, $ctx, 0, $dtype,
         [$indices_type], [$indices->shape]
     );
     my $result = AI::MXNet::NDArray::RowSparse->new(handle => $handle);
@@ -1265,13 +1267,13 @@ method _array(
 {
     if(not blessed $source_array or $source_array->isa('PDL'))
     {
-        $source_array = __PACKAGE__->array($source_array, ctx => $ctx, dtype => $dtype);
+        return __PACKAGE__->array($source_array, ctx => $ctx, dtype => $dtype);
     }
     if($source_array->isa('AI::MXNet::NDArray'))
     {
         assert(
             ($source_array->stype ne 'default'),
-            "Please use tostype to create AI::MXNet::NDarray::RowSparse or AI::MXNet::NDarrayCSR from an AI::MXNet::NDarray"
+            "Please use tostype to create AI::MXNet::NDarray::RowSparse or AI::MXNet::NDarray::CSR from an AI::MXNet::NDarray"
         );
         # prepare dtype and ctx based on source_array, if not provided
         $dtype = __PACKAGE__->_prepare_default_dtype($source_array, $dtype);

@@ -671,6 +671,10 @@ func rand_sparse_ndarray(
         {
             $val = assign_each($val, $modifier_func);
         }
+        use Data::Dumper;
+        warn Dumper [$val, $indices];
+        warn "kav $val";
+        warn "kav $indices";
         my $arr = mx->nd->sparse->row_sparse_array([$val, $indices], shape=>$shape, dtype=>$dtype);
         return ($arr, [$val, $indices]);
     }

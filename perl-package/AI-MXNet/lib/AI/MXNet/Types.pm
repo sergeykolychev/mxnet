@@ -81,6 +81,6 @@ subtype "NameShapeOrDataDesc" => as "NameShape|AI::MXNet::DataDesc";
 subtype "AdvancedSlice"   => as "ArrayRef[ArrayRef|PDL|PDL::Matrix|AI::MXNet::NDArray]";
 subtype "InternalSlice"   => as enum([qw[begin end step]]);
 subtype "Stype"           => as enum([qw[default csr row_sparse]]);
-
+subtype "AuxTypes"        => as "ArrayRef[Dtype]";
 
 1;
