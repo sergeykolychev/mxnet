@@ -29,7 +29,7 @@ use base qw(Exporter);
 @AI::MXNet::TestUtils::EXPORT_OK = qw(same reldiff almost_equal GetMNIST_ubyte
                                       GetCifar10 pdl_maximum pdl_minimum mlp2 conv
                                       check_consistency zip assert enumerate same_array dies_like allclose rand_shape_2d
-                                      rand_sparse_ndarray random_arrays);
+                                      rand_shape_3d rand_sparse_ndarray random_arrays rand_ndarray);
 use constant default_numerical_threshold => 1e-6;
 =head1 NAME
 
@@ -411,7 +411,7 @@ func dies_like($code, $regexp)
 
 func random_arrays(@shapes)
 {
-    my @arrays = map { random(@$_)->float } @shapes;
+    my @arrays = map { random(reverse(@$_))->float } @shapes;
     if(@arrays > 1)
     {
         return @arrays;
@@ -651,9 +651,12 @@ func rand_sparse_ndarray(
         }
         else
         {
+            warn $density;
+            warn $shape->[0];
             my $idx_sample = random($shape->[0]);
             $indices = which($idx_sample < $density);
         }
+        warn "$indices";
         if($indices->shape(-1)->at(0) == 0)
         {
             my $result = mx->nd->zeros($shape, stype=>'row_sparse', dtype=>$dtype);
@@ -671,11 +674,9 @@ func rand_sparse_ndarray(
         {
             $val = assign_each($val, $modifier_func);
         }
-        use Data::Dumper;
-        warn Dumper [$val, $indices];
-        warn "kav $val";
-        warn "kav $indices";
+        warn "$val";
         my $arr = mx->nd->sparse->row_sparse_array([$val, $indices], shape=>$shape, dtype=>$dtype);
+        warn "here";
         return ($arr, [$val, $indices]);
     }
     elsif($stype eq 'csr')
@@ -707,8 +708,8 @@ func rand_sparse_ndarray(
 }
 
 func rand_ndarray(
-    $shape, $stype, $density=, $dtype='float32',
-    $modifier_func=, $shuffle_csr_indices=0, $distribution=
+    $shape, $stype, $density=rand, $dtype='float32',
+    $modifier_func=, $shuffle_csr_indices=0, $distribution='uniform'
 )
 {
     my $arr;
@@ -719,8 +720,9 @@ func rand_ndarray(
     else
     {
         ($arr) = rand_sparse_ndarray(
-            $shape, $stype, $density, $dtype,
-            $modifier_func, $shuffle_csr_indices, $distribution
+            $shape, $stype, density => $density, dtype => $dtype,
+            modifier_func => $modifier_func,
+            shuffle_csr_indices => $shuffle_csr_indices, distribution => $distribution
         );
     }
     return $arr;

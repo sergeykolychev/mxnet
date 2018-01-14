@@ -20,8 +20,8 @@ use strict;
 use warnings;
 use Test::More 'no_plan';
 use AI::MXNet qw(mx);
-use AI::MXNet::TestUtils qw(zip assert enumerate rand_shape_2d rand_sparse_ndarray random_arrays almost_equal);
-
+use AI::MXNet::TestUtils qw(zip assert enumerate rand_shape_2d rand_shape_3d rand_sparse_ndarray random_arrays almost_equal rand_ndarray);
+$ENV{MXNET_STORAGE_FALLBACK_LOG_VERBOSE} = 0;
 use Data::Dumper;
 sub sparse_nd_ones
 {
@@ -70,40 +70,49 @@ sub test_sparse_nd_elemwise_add
 
 test_sparse_nd_elemwise_add();
 
-__END__
-
-def test_sparse_nd_copy():
-    def check_sparse_nd_copy(from_stype, to_stype, shape):
-        from_nd = rand_ndarray(shape, from_stype)
+sub test_sparse_nd_copy
+{
+    my $check_sparse_nd_copy = sub { my ($from_stype, $to_stype, $shape) = @_;
+        my $from_nd = rand_ndarray($shape, $from_stype);
         # copy to ctx
-        to_ctx = from_nd.copyto(default_context())
+        my $to_ctx = $from_nd->copyto(AI::MXNet::Context->current_ctx);
         # copy to stype
-        to_nd = rand_ndarray(shape, to_stype)
-        to_nd = from_nd.copyto(to_nd)
-        assert np.sum(np.abs(from_nd.asnumpy() != to_ctx.asnumpy())) == 0.0
-        assert np.sum(np.abs(from_nd.asnumpy() != to_nd.asnumpy())) == 0.0
+        my $to_nd = rand_ndarray($shape, $to_stype);
+        $from_nd->copyto($to_nd);
+        ok(($from_nd->aspdl != $to_ctx->aspdl)->abs->sum == 0);
+        ok(($from_nd->aspdl != $to_nd->aspdl)->abs->sum == 0);
+    };
+    my $shape = rand_shape_2d();
+    my $shape_3d = rand_shape_3d();
+    my @stypes = ('row_sparse', 'csr');
+    for my $stype (@stypes)
+    {
+        $check_sparse_nd_copy->($stype, 'default', $shape);
+        $check_sparse_nd_copy->('default', $stype, $shape);
+    }
+    $check_sparse_nd_copy->('row_sparse', 'row_sparse', $shape_3d);
+    $check_sparse_nd_copy->('row_sparse', 'default', $shape_3d);
+    $check_sparse_nd_copy->('default', 'row_sparse', $shape_3d);
+}
 
-    shape = rand_shape_2d()
-    shape_3d = rand_shape_3d()
-    stypes = ['row_sparse', 'csr']
-    for stype in stypes:
-        check_sparse_nd_copy(stype, 'default', shape)
-        check_sparse_nd_copy('default', stype, shape)
-    check_sparse_nd_copy('row_sparse', 'row_sparse', shape_3d)
-    check_sparse_nd_copy('row_sparse', 'default', shape_3d)
-    check_sparse_nd_copy('default', 'row_sparse', shape_3d)
+test_sparse_nd_copy();
 
-def test_sparse_nd_basic():
-    def check_sparse_nd_basic_rsp():
-        storage_type = 'row_sparse'
-        shape = rand_shape_2d()
-        nd, (v, idx) = rand_sparse_ndarray(shape, storage_type)
-        assert(nd._num_aux == 1)
-        assert(nd.indices.dtype == np.int64)
-        assert(nd.stype == 'row_sparse')
+sub test_sparse_nd_basic
+{
+    my $check_sparse_nd_basic_rsp = sub {
+        my $storage_type = 'row_sparse';
+        my $shape = rand_shape_2d();
+        my ($nd) = rand_sparse_ndarray($shape, $storage_type);
+        ok($nd->_num_aux == 1);
+        ok($nd->indices->dtype eq 'int64');
+        ok($nd->stype eq 'row_sparse');
+    };
+    $check_sparse_nd_basic_rsp->();
+}
 
-    check_sparse_nd_basic_rsp()
+test_sparse_nd_basic();
 
+__END__
 
 def test_sparse_nd_setitem():
     def check_sparse_nd_setitem(stype, shape, dst):

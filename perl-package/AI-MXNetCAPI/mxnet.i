@@ -583,6 +583,14 @@ int MXNDArrayGetAuxNDArray(NDArrayHandle handle,
                                      mx_uint i,
                                      NDArrayHandle *out);
 /*!
+ * \brief Get a deep copy of the data blob
+ * in the form of an NDArray of default storage type.
+ * This function blocks. Do not use it in performance critical code.
+ */
+int MXNDArrayGetDataNDArray(NDArrayHandle handle,
+                                      NDArrayHandle *out);
+
+/*!
  * \brief get the context of the NDArray
  * \param handle the handle to the ndarray
  * \param out_dev_type the output device type

@@ -71,7 +71,6 @@ method _new_alloc_handle(
 method _class_name()
 {
     my $class = ref $self || $self;
-    $class =~ s/^.+:://;
     $class;
 }
 
@@ -79,7 +78,7 @@ sub not_implemented { confess "Not implemented" }
 use overload '""' => sub {
                         my $self = shift;
                         my $shape_info = join('x', @{ $self->shape });
-                        sprintf("\n<%s, % @%s>", $self->_class_name, $shape_info, $self->context);
+                        sprintf("\n<%s, %s @%s>", $self->_class_name, $shape_info, $self->context);
                      },
              '+=' => \&not_implemented,
              '-=' => \&not_implemented,
@@ -862,7 +861,7 @@ method csr_matrix(
         elsif($arg_len == 3)
         {
             # data, indices, indptr
-            return _csr_matrix_from_definition(
+            return __PACKAGE__->_csr_matrix_from_definition(
                 @{ $arg1 }, shape  => $shape,
                 ctx => $ctx, dtype => $dtype
             );
@@ -1035,8 +1034,6 @@ method row_sparse_array(
             }
             else
             {
-                use Data::Dumper;
-                warn Dumper([@{ $arg1 }, shape => $shape, ctx => $ctx, dtype => $dtype]);
                 # data, indices, indptr
                 return __PACKAGE__->_row_sparse_ndarray_from_definition(
                     @{ $arg1 }, shape => $shape, ctx => $ctx, dtype => $dtype
@@ -1075,7 +1072,6 @@ method row_sparse_array(
         }
     }
 }
-use Data::Dumper;
 
 # Create a AI::MXNet::NDArray::RowSparse based on data and indices
 method _row_sparse_ndarray_from_definition(
@@ -1088,12 +1084,8 @@ method _row_sparse_ndarray_from_definition(
 {
     $dtype = __PACKAGE__->_prepare_default_dtype($data, $dtype);
     # prepare src array and types
-warn Dumper [$data, $indices];
-print $data;
-print $indices;
     $data = __PACKAGE__->_prepare_src_array($data, $dtype);
     $indices = __PACKAGE__->_prepare_src_array($indices, $indices_type);
-warn Dumper [$data, $indices];
 
     if(not (blessed $data and $data->isa('AI::MXNet::NDArray')))
     {
@@ -1103,8 +1095,6 @@ warn Dumper [$data, $indices];
     {
         $indices = __PACKAGE__->_array($indices, ctx => $ctx, dtype => $indices_type);
     }
-warn Dumper [$data, $indices];
-
     if(not defined $shape)
     {
         my $num_indices = $indices->shape->[0];
@@ -1116,7 +1106,6 @@ warn Dumper [$data, $indices];
         $shape = [$dim0, @{ $data->shape } [1..@{ $data->shape } - 1]];
     }
     # verify shapes
-warn Dumper [$data, $indices];
     if($data->ndim != @{ $shape } or $indices->ndim != 1 or product(@{ $shape } [1..@{ $shape } - 1]) == 0)
     {
         confess("invalid shape");
