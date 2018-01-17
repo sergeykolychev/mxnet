@@ -228,6 +228,13 @@ struct DeviceStats {
 };
 
 /*!
+ *  _____              __  _  _
+ * |  __ \            / _|(_)| |
+ * | |__) |_ __  ___ | |_  _ | | ___  _ __
+ * |  ___/| '__|/ _ \|  _|| || |/ _ \| '__|
+ * | |    | |  | (_) | |  | || |  __/| |
+ * |_|    |_|   \___/|_|  |_||_|\___||_|
+ *
  * \brief profiler that records the operation execution information
  *        and saves the profile statistics.
  * \note Profiler class doesn't know anything about VTune
@@ -924,9 +931,6 @@ struct ProfileMarker {
    * \brief Instant-marker statistic object
    */
   struct ProfileMarkerStat : public ProfileStat {
-    enum InstantScope {
-      kGlobal = 'g', kprocess = 'p', kThread = 't'
-    };
     explicit ProfileMarkerStat(const char *name, const char scope_char, bool nestable)
     : scope_char_(scope_char) {
       items_[0].enabled_ = true;

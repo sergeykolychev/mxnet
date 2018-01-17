@@ -70,7 +70,7 @@ def test_profiler():
 
 def test_profile_create_domain():
     enable_profiler()
-    domain = profiler.create_domain(name='PythonDomain')
+    domain = profiler.Domain(name='PythonDomain')
     print("Domain created: {}".format(str(domain)))
 
 
@@ -151,13 +151,13 @@ def test_profile_event(do_enable_profiler=True):
 
 def test_profile_tune_pause_resume():
     enable_profiler()
-    profiler.tune_pause()
+    profiler.profiler_pause()
     # "test_profile_task" should *not* show up in tuning analysis
     test_profile_task()
-    profiler.tune_resume()
+    profiler.profiler_resume()
     # "test_profile_event" should show up in tuning analysis
     test_profile_event()
-    profiler.tune_pause()
+    profiler.profiler_pause()
 
 
 def test_profile_counter(do_enable_profiler=True):
@@ -194,7 +194,7 @@ def test_continuous_profile_and_instant_marker():
     python_domain = profiler.Domain('PythonDomain::test_continuous_profile')
     last_file_size = 0
     for i in range(10):
-        profiler.InstantMarker(python_domain, "StartIteration-" + str(i)).signal('process')
+        profiler.Marker(python_domain, "StartIteration-" + str(i)).mark('process')
         if i > 1 and i % 10 == 0:
             print("{}...".format(i))
         test_profile_event(False)

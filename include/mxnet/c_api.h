@@ -344,9 +344,9 @@ MXNET_DLL int MXProfileAdjustCounter(ProfileHandle counter_handle, int64_t value
  * \param scope Scope of marker ('global', 'process', 'thread', 'task', 'marker')
  * \return 0 when success, -1 when failure happens.
  */
-MXNET_DLL int MXProfileSetInstantMarker(ProfileHandle domain,
-                                        const char *instant_marker_name,
-                                        const char *scope);
+MXNET_DLL int MXProfileSetMarker(ProfileHandle domain,
+                                 const char *instant_marker_name,
+                                 const char *scope);
 
 /*!
  * \brief Set the number of OMP threads to use

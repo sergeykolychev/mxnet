@@ -516,9 +516,9 @@ int MXProfileAdjustCounter(ProfileHandle counter_handle, int64_t by_value) {
   API_END();
 }
 
-int MXProfileSetInstantMarker(ProfileHandle domain,
-                              const char *instant_marker_name,
-                              const char *scope) {
+int MXProfileSetMarker(ProfileHandle domain,
+                       const char *instant_marker_name,
+                       const char *scope) {
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER

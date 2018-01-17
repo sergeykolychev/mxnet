@@ -56,83 +56,11 @@ def dump_profile():
     in advance in case your program cannot exit normally."""
     check_call(_LIB.MXDumpProfile())
 
-def create_domain(name):
-    domain_handle = ProfileHandle()
-    check_call(_LIB.MXProfileCreateDomain(c_str(name), ctypes.byref(domain_handle)))
-    return domain_handle
-
-def create_task(domain_handle, name):
-    task_handle = ProfileHandle()
-    check_call(_LIB.MXProfileCreateTask(domain_handle,
-                                        c_str(name),
-                                        ctypes.byref(task_handle)))
-    return task_handle
-
-def destroy_task(task_handle):
-    check_call(_LIB.MXProfileDestroyHandle(task_handle))
-
-def task_start(task_handle):
-    check_call(_LIB.MXProfileDurationStart(task_handle))
-
-def task_stop(task_handle):
-    check_call(_LIB.MXProfileDurationStop(task_handle))
-
-def create_frame(domain_handle, name):
-    frame_handle = ProfileHandle()
-    check_call(_LIB.MXProfileCreateFrame(domain_handle,
-                                         c_str(name),
-                                         ctypes.byref(frame_handle)))
-    return frame_handle
-
-def destroy_frame(frame_handle):
-    check_call(_LIB.MXProfileDestroyHandle(frame_handle))
-
-def frame_start(frame_handle):
-    check_call(_LIB.MXProfileDurationStart(frame_handle))
-
-def frame_stop(frame_handle):
-    check_call(_LIB.MXProfileDurationStop(frame_handle))
-
-def create_event(name):
-    event_handle = ProfileHandle()
-    check_call(_LIB.MXProfileCreateEvent(c_str(name), ctypes.byref(event_handle)))
-    return event_handle
-
-def destroy_event(event_handle):
-    check_call(_LIB.MXProfileDestroyHandle(event_handle))
-
-def event_start(event_handle):
-    check_call(_LIB.MXProfileDurationStart(event_handle))
-
-def event_stop(event_handle):
-    check_call(_LIB.MXProfileDurationStop(event_handle))
-
-def tune_pause():
+def profiler_pause():
     check_call(_LIB.MXProfilePause(int(1)))
 
-def tune_resume():
+def profiler_resume():
     check_call(_LIB.MXProfilePause(int(0)))
-
-def create_counter(domain_handle, name, value=None):
-    counter_handle = ProfileHandle()
-    check_call(_LIB.MXProfileCreateCounter(domain_handle,
-                                           c_str(name),
-                                           ctypes.byref(counter_handle)))
-    if value is not None:
-        set_counter(counter_handle, value)
-    return counter_handle
-
-def destroy_counter(counter_handle):
-    check_call(_LIB.MXProfileDestroyHandle(counter_handle))
-
-def set_counter(counter_handle, value):
-    check_call(_LIB.MXProfileSetCounter(counter_handle, int(value)))
-
-def increment_counter(counter_handle, by_value):
-    check_call(_LIB.MXProfileAdjustCounter(counter_handle, int(by_value)))
-
-def decrement_counter(counter_handle, by_value):
-    check_call(_LIB.MXProfileAdjustCounter(counter_handle, -int(by_value)))
 
 def set_continuous_dump(continuous_dump=True, delay_in_seconds=1.0):
     if continuous_dump is False:
@@ -142,50 +70,49 @@ def set_continuous_dump(continuous_dump=True, delay_in_seconds=1.0):
     ds = float(delay_in_seconds)
     check_call(_LIB.MXSetContinuousProfileDump(ctypes.c_int(cd), ctypes.c_float(ds)))
 
-def set_instant_marker(domain_handle, name, scope='process'):
-    check_call(_LIB.MXProfileSetInstantMarker(domain_handle, c_str(name), c_str(scope)))
-
-
-class Domain:
+class Domain(object):
     """Profiling domain, used to group sub-objects like tasks, counters, etc into categories
     Serves as part of 'categories' for chrome://tracing
-    Note: Domain handles are never destroyed
+    Note: Domain handles are never destroyed.
     """
     def __init__(self, name):
         self.name = name
-        self.handle = create_domain(name)
+        self.handle = ProfileHandle()
+        check_call(_LIB.MXProfileCreateDomain(c_str(self.name), ctypes.byref(self.handle)))
 
     def __str__(self):
         return self.name
 
 
-class Task:
+class Task(object):
     """Profiling Task class
     A task is a logical unit of work performed by a particular thread.
     Tasks can nest; thus, tasks typically correspond to functions, scopes, or a case block
     in a switch statement.
-    You can use the Task API to assign tasks to threads
+    You can use the Task API to assign tasks to threads.
     """
     def __init__(self, domain, name):
-        self.domain = domain
         self.name = name
-        self.handle = create_task(domain.handle, name)
+        self.handle = ProfileHandle()
+        check_call(_LIB.MXProfileCreateTask(domain.handle,
+                                            c_str(self.name),
+                                            ctypes.byref(self.handle)))
 
     def start(self):
-        task_start(self.handle)
+        check_call(_LIB.MXProfileDurationStart(self.handle))
 
     def stop(self):
-        task_stop(self.handle)
+        check_call(_LIB.MXProfileDurationStop(self.handle))
 
     def __str__(self):
         return self.name
 
     def __del__(self):
         if self.handle is not None:
-            destroy_task(self.handle)
+            check_call(_LIB.MXProfileDestroyHandle(self.handle))
 
 
-class Frame:
+class Frame(object):
     """Profiling Frame class
     Use the frame API to insert calls to the desired places in your code and analyze
     performance per frame, where frame is the time period between frame begin and end points.
@@ -193,25 +120,27 @@ class Frame:
     separate track, so they provide a way to visually separate this data from normal task data.
     """
     def __init__(self, domain, name):
-        self.domain = domain
         self.name = name
-        self.handle = create_frame(domain.handle, name)
+        self.handle = ProfileHandle()
+        check_call(_LIB.MXProfileCreateFrame(domain.handle,
+                                             c_str(self.name),
+                                             ctypes.byref(self.handle)))
 
     def start(self):
-        frame_start(self.handle)
+        check_call(_LIB.MXProfileDurationStart(self.handle))
 
     def stop(self):
-        frame_stop(self.handle)
+        check_call(_LIB.MXProfileDurationStop(self.handle))
 
     def __str__(self):
         return self.name
 
     def __del__(self):
         if self.handle is not None:
-            destroy_frame(self.handle)
+            check_call(_LIB.MXProfileDestroyHandle(self.handle))
 
 
-class Event:
+class Event(object):
     """Profiling Event class
     The event API is used to observe when demarcated events occur in your application, or to
     identify how long it takes to execute demarcated regions of code. Set annotations in the
@@ -222,38 +151,44 @@ class Event:
     """
     def __init__(self, name):
         self.name = name
-        self.handle = create_event(name)
+        self.handle = ProfileHandle()
+        check_call(_LIB.MXProfileCreateEvent(c_str(self.name), ctypes.byref(self.handle)))
 
     def start(self):
-        event_start(self.handle)
+        check_call(_LIB.MXProfileDurationStart(self.handle))
 
     def stop(self):
-        event_stop(self.handle)
+        check_call(_LIB.MXProfileDurationStop(self.handle))
 
     def __str__(self):
         return self.name
 
     def __del__(self):
         if self.handle is not None:
-            destroy_event(self.handle)
+            check_call(_LIB.MXProfileDestroyHandle(self.handle))
 
 
-class Counter:
+class Counter(object):
     """Profiling Counter class
     The counter event can track a value as it changes over time.
     """
-    def __init__(self, domain, name, value=0):
+    def __init__(self, domain, name, value=None):
         self.name = name
-        self.handle = create_counter(domain.handle, name, value)
+        self.handle = ProfileHandle()
+        check_call(_LIB.MXProfileCreateCounter(domain.handle,
+                                               c_str(name),
+                                               ctypes.byref(self.handle)))
+        if value is not None:
+            self.set_value(value)
 
     def set_value(self, value):
-        set_counter(self.handle, value)
+        check_call(_LIB.MXProfileSetCounter(self.handle, int(value)))
 
     def increment(self, value_change):
-        increment_counter(self.handle, value_change)
+        check_call(_LIB.MXProfileAdjustCounter(self.handle, int(value_change)))
 
     def decrement(self, value_change):
-        decrement_counter(self.handle, value_change)
+        check_call(_LIB.MXProfileAdjustCounter(self.handle, -int(value_change)))
 
     def __iadd__(self, value_change):
         self.increment(value_change)
@@ -268,15 +203,23 @@ class Counter:
 
     def __del__(self):
         if self.handle is not None:
-            destroy_counter(self.handle)
+            check_call(_LIB.MXProfileDestroyHandle(self.handle))
 
 
-class InstantMarker:
+class Marker(object):
     """Set marker for an instant in time"""
     def __init__(self, domain, name):
         self.name = name
         self.domain = domain
 
-    def signal(self, scope='process'):
-        set_instant_marker(self.domain.handle, self.name, scope)
+    def mark(self, scope='process'):
+        """Set up the profiler state to record operator.
 
+        Parameters
+        ----------
+        scope : string, optional
+            Indicates what scope the marker should refer to.
+            Can be 'global', 'process', thread', task', and 'marker'
+            Default is `process`.
+        """
+        check_call(_LIB.MXProfileSetMarker(self.domain.handle, c_str(self.name), c_str(scope)))
