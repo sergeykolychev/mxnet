@@ -31,7 +31,7 @@
 #include <dmlc/thread_group.h>
 #include <stack>
 #include "./c_api_common.h"
-#include "profiler/profiler.h"
+#include "../profiler/profiler.h"
 
 namespace mxnet {
 

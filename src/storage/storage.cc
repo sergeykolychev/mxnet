@@ -21,7 +21,6 @@
  * Copyright (c) 2015 by Contributors
  */
 #include <mxnet/storage.h>
-#include "profiler/profiler.h"
 #include "./storage_manager.h"
 #include "./naive_storage_manager.h"
 #include "./pooled_storage_manager.h"
@@ -29,7 +28,7 @@
 #include "./cpu_device_storage.h"
 #include "./pinned_memory_storage.h"
 #include "../common/lazy_alloc_array.h"
-#include "profiler/storage_profiler.h"
+#include "../profiler/storage_profiler.h"
 
 namespace mxnet {
 

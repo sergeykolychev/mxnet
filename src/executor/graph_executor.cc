@@ -30,7 +30,7 @@
 
 #include "./exec_pass.h"
 #include "./graph_executor.h"
-#include "profiler/profiler.h"
+#include "../profiler/profiler.h"
 #include "../common/utils.h"
 
 namespace mxnet {

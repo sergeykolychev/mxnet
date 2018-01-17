@@ -32,7 +32,7 @@
 #include <mutex>
 #include <memory>
 #include <array>
-#include "profiler/vtune.h"
+#include "./vtune.h"
 
 #if defined(_WIN32) || defined(_WIN64) || defined(__WINDOWS__)
 #include <windows.h>

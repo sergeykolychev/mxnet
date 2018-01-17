@@ -22,7 +22,7 @@
 #include <mxnet/storage.h>
 #include <string>
 #include <vector>
-#include "profiler/profiler.h"
+#include "./profiler.h"
 
 namespace mxnet {
 namespace storage {
