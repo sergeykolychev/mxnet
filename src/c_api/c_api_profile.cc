@@ -110,9 +110,7 @@ static thread_local ProfilingThreadData thread_profiling_data;
 
 extern void on_enter_api(const char *function) {
 #if MXNET_USE_PROFILER
-  profiler::Profiler *prof = profiler::Profiler::Get();
-  if (prof->GetState() == profiler::Profiler::kRunning
-      && (prof->GetMode() & profiler::Profiler::kAPI) != 0) {
+  if (profiler::Profiler::Get()->IsProfiling(profiler::Profiler::kAPI)) {
     if (!thread_profiling_data.ignore_call_) {
       ++api_call_counter;
       ++api_concurrency_counter;
@@ -131,9 +129,7 @@ extern void on_enter_api(const char *function) {
 
 extern void on_exit_api() {
 #if MXNET_USE_PROFILER
-  profiler::Profiler *prof = profiler::Profiler::Get();
-  if (prof->GetState() == profiler::Profiler::kRunning
-      && (prof->GetMode() & profiler::Profiler::kAPI) != 0) {
+  if (profiler::Profiler::Get()->IsProfiling(profiler::Profiler::kAPI)) {
     if (!thread_profiling_data.ignore_call_) {
       CHECK(!thread_profiling_data.calls_.empty());
       APICallTimingData data = thread_profiling_data.calls_.top();
@@ -175,6 +171,8 @@ struct IgnoreProfileCallScope {
  *       start burning CPU unnoticed
  */
 struct PythonProfileObjects {
+  // These will almost never collide, so locking will happen in user-space (at least on Linux)
+  // since pthreads uses futexes.
   std::mutex cs_domains_;
   std::mutex cs_counters_;
   std::mutex cs_tasks_;
@@ -202,26 +200,38 @@ static void warn_not_built_with_profiler_enabled() {
 }
 #endif  // MXNET_USE_PROFILER
 
-struct ProfileModeParam : public dmlc::Parameter<ProfileModeParam> {
-  int mode;
-  DMLC_DECLARE_PARAMETER(ProfileModeParam) {
-    DMLC_DECLARE_FIELD(mode).set_default(profiler::Profiler::kSymbolic)
-      .add_enum("symbolic", profiler::Profiler::kSymbolic)
-      .add_enum("imperative", profiler::Profiler::kImperative)
-      .add_enum("api", profiler::Profiler::kAPI)
-      .add_enum("memory", profiler::Profiler::kMemory)
-      .add_enum("all_ops", profiler::Profiler::kSymbolic|profiler::Profiler::kImperative)
-      .add_enum("all", profiler::Profiler::kSymbolic|profiler::Profiler::kImperative
-                       |profiler::Profiler::kAPI|profiler::Profiler::kMemory)
-      .describe("Profile mode.");
+struct ProfileConfigParam : public dmlc::Parameter<ProfileConfigParam> {
+  bool profile_symbolic;
+  bool profile_imperative;
+  bool profile_memory;
+  bool profile_api;
+  std::string file_name;
+  bool continuous_dump;
+  float dump_period;
+  DMLC_DECLARE_PARAMETER(ProfileConfigParam) {
+    DMLC_DECLARE_FIELD(profile_symbolic).set_default(true)
+      .describe("Profile symbolic operators.");
+    DMLC_DECLARE_FIELD(profile_imperative).set_default(true)
+      .describe("Profile imperative operators.");
+    DMLC_DECLARE_FIELD(profile_memory).set_default(true)
+      .describe("Profile memory.");
+    DMLC_DECLARE_FIELD(profile_api).set_default(true)
+      .describe("Profile C API.");
+    DMLC_DECLARE_FIELD(file_name).set_default("profile.json")
+      .describe("File name to write profiling info.");
+    DMLC_DECLARE_FIELD(continuous_dump).set_default(true)
+      .describe("Periodically dump (and append) priofling data to file while running.");
+    DMLC_DECLARE_FIELD(dump_period).set_default(1.0f)
+      .describe("When continuous dump is enabled, the period between subsequent "
+                  "profile info dumping.");
   }
 };
 
-DMLC_REGISTER_PARAMETER(ProfileModeParam);
+DMLC_REGISTER_PARAMETER(ProfileConfigParam);
 
-struct ProfileInstantScopeParam : public dmlc::Parameter<ProfileInstantScopeParam> {
+struct ProfileMarkerScopeParam : public dmlc::Parameter<ProfileMarkerScopeParam> {
   int scope;
-  DMLC_DECLARE_PARAMETER(ProfileInstantScopeParam) {
+  DMLC_DECLARE_PARAMETER(ProfileMarkerScopeParam) {
     DMLC_DECLARE_FIELD(scope).set_default(profiler::ProfileMarker::kProcess)
       .add_enum("global", profiler::ProfileMarker::kGlobal)
       .add_enum("process", profiler::ProfileMarker::kProcess)
@@ -232,17 +242,30 @@ struct ProfileInstantScopeParam : public dmlc::Parameter<ProfileInstantScopePara
   }
 };
 
-DMLC_REGISTER_PARAMETER(ProfileInstantScopeParam);
+DMLC_REGISTER_PARAMETER(ProfileMarkerScopeParam);
 
-int MXSetProfilerConfig(const char *mode, const char* filename, const int append_mode) {
-  mxnet::IgnoreProfileCallScope ignore;
+int MXSetProfilerConfig(int num_params, const char** keys, const char** vals) {
+    mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
-    ProfileModeParam param;
-    std::vector<std::pair<std::string, std::string>> kwargs = {{ "mode", mode }};
+    std::vector<std::pair<std::string, std::string>> kwargs;
+    kwargs.reserve(num_params);
+    for (int i = 0; i < num_params; ++i) {
+      CHECK_NOTNULL(keys[i]);
+      CHECK_NOTNULL(vals[i]);
+      kwargs.emplace_back(std::make_pair(keys[i], vals[i]));
+    }
+    ProfileConfigParam param;
     param.Init(kwargs);
-    profiler::Profiler::Get()->SetConfig(profiler::Profiler::ProfilerMode(param.mode),
-                                        std::string(filename), append_mode != 0);
+    int mode = 0;
+    if (param.profile_api)        { mode |= profiler::Profiler::kAPI; }
+    if (param.profile_symbolic)   { mode |= profiler::Profiler::kSymbolic; }
+    if (param.profile_imperative) { mode |= profiler::Profiler::kImperative; }
+    if (param.profile_memory)     { mode |= profiler::Profiler::kMemory; }
+    profiler::Profiler::Get()->SetConfig(profiler::Profiler::ProfilerMode(mode),
+                                         std::string(param.file_name),
+                                         param.continuous_dump,
+                                         param.dump_period);
 #else
     warn_not_built_with_profiler_enabled();
 #endif
@@ -277,16 +300,6 @@ int MXSetProfilerState(int state) {
         break;
     }
     profiler::Profiler::Get()->SetState(profiler::Profiler::ProfilerState(state));
-#else
-    warn_not_built_with_profiler_enabled();
-#endif
-  API_END();
-}
-
-int MXSetContinuousProfileDump(int continuous_dump, float delay_in_seconds) {
-  API_BEGIN();
-#if MXNET_USE_PROFILER
-    profiler::Profiler::Get()->SetContinuousProfileDump(continuous_dump != 0, delay_in_seconds);
 #else
     warn_not_built_with_profiler_enabled();
 #endif
@@ -522,7 +535,7 @@ int MXProfileSetMarker(ProfileHandle domain,
   mxnet::IgnoreProfileCallScope ignore;
   API_BEGIN();
 #if MXNET_USE_PROFILER
-    ProfileInstantScopeParam param;
+    ProfileMarkerScopeParam param;
     std::vector<std::pair<std::string, std::string>> kwargs = {{ "scope", scope }};
     param.Init(kwargs);
     profiler::ProfileMarker marker(instant_marker_name,

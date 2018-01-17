@@ -22,9 +22,15 @@ from mxnet import profiler
 import time
 import os
 
-def enable_profiler(run=True, append_mode=False):
+def enable_profiler(run=True, continuous_dump=False):
     profile_filename = "test_profile.json"
-    profiler.profiler_set_config(mode='all', filename=profile_filename, append_mode=append_mode)
+    kwargs = [('profile_symbolic', True),
+              ('profile_imperative', True),
+              ('profile_memory', True),
+              ('profile_api', True),
+              ('file_name', profile_filename),
+              ('continuous_dump', continuous_dump)]
+    profiler.profiler_set_config(kwargs)
     print('profile file save to {0}'.format(profile_filename))
     if run is True:
       profiler.profiler_set_state('run')
@@ -190,7 +196,6 @@ def test_profile_counter(do_enable_profiler=True):
 
 def test_continuous_profile_and_instant_marker():
     enable_profiler(True, True)
-    profiler.set_continuous_dump(True, 0.1)
     python_domain = profiler.Domain('PythonDomain::test_continuous_profile')
     last_file_size = 0
     for i in range(10):

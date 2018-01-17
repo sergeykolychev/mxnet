@@ -21,23 +21,29 @@
 """Profiler setting methods."""
 from __future__ import absolute_import
 import ctypes
-from .base import _LIB, check_call, c_str, ProfileHandle
+from .base import _LIB, check_call, c_str, ProfileHandle, c_str_array
 
-def profiler_set_config(mode='symbolic', filename='profile.json', append_mode=True):
+def profiler_set_config(flags):
     """Set up the configure of profiler.
 
     Parameters
     ----------
-    mode : string, optional
-        Indicates whether to enable the profiler, can
-        be 'symbolic', 'imperative', 'api, 'memory', 'all_ops', or 'all'.
-        Defaults to `symbolic`.
-    filename : string, optional
-        The name of output trace file. Defaults to 'profile.json'.
+    flags : configuration parameters
+        Indicates configuration parameters
+          profile_symbolic : boolean, whether to profile symbolic operators
+          profile_imperative : boolean, whether to profile imperative operators
+          profile_memory : boolean, whether to profile memory usage
+          profile_api : boolean, whether to profile the C API
+          file_name : string, output file for profile data
+          continuous_dump : boolean, whether to periodically dump profiling data to file
+          dump_period : float, seconds between profile data dumps
     """
-    check_call(_LIB.MXSetProfilerConfig(c_str(mode),
-                                        c_str(filename),
-                                        1 if append_mode is True else 0))
+    keys = [key for key, _ in flags]
+    vals = [str(val) for _, val in flags]
+    check_call(_LIB.MXSetProfilerConfig(len(flags),
+                                        c_str_array([key for key, _ in flags]),
+                                        c_str_array([str(val) for _, val in flags])))
+
 
 def profiler_set_state(state='stop'):
     """Set up the profiler state to record operator.
@@ -61,14 +67,6 @@ def profiler_pause():
 
 def profiler_resume():
     check_call(_LIB.MXProfilePause(int(0)))
-
-def set_continuous_dump(continuous_dump=True, delay_in_seconds=1.0):
-    if continuous_dump is False:
-        cd = 0
-    else:
-        cd = 1
-    ds = float(delay_in_seconds)
-    check_call(_LIB.MXSetContinuousProfileDump(ctypes.c_int(cd), ctypes.c_float(ds)))
 
 class Domain(object):
     """Profiling domain, used to group sub-objects like tasks, counters, etc into categories
@@ -98,6 +96,10 @@ class Task(object):
                                             c_str(self.name),
                                             ctypes.byref(self.handle)))
 
+    def __del__(self):
+        if self.handle is not None:
+            check_call(_LIB.MXProfileDestroyHandle(self.handle))
+
     def start(self):
         check_call(_LIB.MXProfileDurationStart(self.handle))
 
@@ -106,10 +108,6 @@ class Task(object):
 
     def __str__(self):
         return self.name
-
-    def __del__(self):
-        if self.handle is not None:
-            check_call(_LIB.MXProfileDestroyHandle(self.handle))
 
 
 class Frame(object):
@@ -126,6 +124,10 @@ class Frame(object):
                                              c_str(self.name),
                                              ctypes.byref(self.handle)))
 
+    def __del__(self):
+        if self.handle is not None:
+            check_call(_LIB.MXProfileDestroyHandle(self.handle))
+
     def start(self):
         check_call(_LIB.MXProfileDurationStart(self.handle))
 
@@ -134,10 +136,6 @@ class Frame(object):
 
     def __str__(self):
         return self.name
-
-    def __del__(self):
-        if self.handle is not None:
-            check_call(_LIB.MXProfileDestroyHandle(self.handle))
 
 
 class Event(object):
@@ -154,6 +152,10 @@ class Event(object):
         self.handle = ProfileHandle()
         check_call(_LIB.MXProfileCreateEvent(c_str(self.name), ctypes.byref(self.handle)))
 
+    def __del__(self):
+        if self.handle is not None:
+            check_call(_LIB.MXProfileDestroyHandle(self.handle))
+
     def start(self):
         check_call(_LIB.MXProfileDurationStart(self.handle))
 
@@ -162,10 +164,6 @@ class Event(object):
 
     def __str__(self):
         return self.name
-
-    def __del__(self):
-        if self.handle is not None:
-            check_call(_LIB.MXProfileDestroyHandle(self.handle))
 
 
 class Counter(object):
@@ -180,6 +178,10 @@ class Counter(object):
                                                ctypes.byref(self.handle)))
         if value is not None:
             self.set_value(value)
+
+    def __del__(self):
+        if self.handle is not None:
+            check_call(_LIB.MXProfileDestroyHandle(self.handle))
 
     def set_value(self, value):
         check_call(_LIB.MXProfileSetCounter(self.handle, int(value)))
@@ -200,10 +202,6 @@ class Counter(object):
 
     def __str__(self):
         return self.name
-
-    def __del__(self):
-        if self.handle is not None:
-            check_call(_LIB.MXProfileDestroyHandle(self.handle))
 
 
 class Marker(object):

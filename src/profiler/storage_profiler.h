@@ -47,8 +47,7 @@ class DeviceStorageProfiler {
   void OnAlloc(const Storage::Handle &handle) {
     if (handle.size > 0) {
       profiler::Profiler *prof = profiler::Profiler::Get();
-      if (prof->GetState() == profiler::Profiler::kRunning
-          && (prof->GetMode() & profiler::Profiler::kMemory) == profiler::Profiler::kMemory) {
+      if (prof->IsProfiling(profiler::Profiler::kMemory)) {
         Init();
         const size_t idx = prof->DeviceIndex(handle.ctx.dev_type, handle.ctx.dev_id);
         CHECK_LT(idx, mem_counters_.size()) << "Invalid device index: " << idx;
@@ -64,8 +63,7 @@ class DeviceStorageProfiler {
   void OnFree(const Storage::Handle &handle) {
     if (handle.size > 0) {
       profiler::Profiler *prof = profiler::Profiler::Get();
-      if (prof->GetState() == profiler::Profiler::kRunning
-          && (prof->GetMode() & profiler::Profiler::kMemory) == profiler::Profiler::kMemory) {
+      if (prof->IsProfiling(profiler::Profiler::kMemory)) {
         Init();  // In case of bug which tries to free first
         const size_t idx = prof->DeviceIndex(handle.ctx.dev_type, handle.ctx.dev_id);
         CHECK_LT(idx, mem_counters_.size()) << "Invalid device index: " << idx;

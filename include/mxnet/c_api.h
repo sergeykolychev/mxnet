@@ -203,6 +203,7 @@ MXNET_DLL const char *MXGetLastError();
  * \return 0 when success, -1 when failure happens.
  */
 MXNET_DLL int MXRandomSeed(int seed);
+
 /*!
  * \brief Notify the engine about a shutdown,
  *  This can help engine to print less messages into display.
@@ -211,14 +212,16 @@ MXNET_DLL int MXRandomSeed(int seed);
  * \return 0 when success, -1 when failure happens.
  */
 MXNET_DLL int MXNotifyShutdown();
+
 /*!
  * \brief Set up configuration of profiler
- * \param mode indicate the working mode of profiler
- * \param filename where to save trace file
- * \param append_mode Whether DumpProfile() call should append to the same profile data file
+ * \param num_params Number of parameters
+ * \param keys array of parameter keys
+ * \param vals array of parameter values
  * \return 0 when success, -1 when failure happens.
  */
-MXNET_DLL int MXSetProfilerConfig(const char *mode, const char* filename, int append_mode);
+MXNET_DLL int MXSetProfilerConfig(int num_params, const char** keys, const char** vals);
+
 /*!
  * \brief Set up state of profiler
  * \param state indicate the working state of profiler,
@@ -234,14 +237,6 @@ MXNET_DLL int MXSetProfilerState(int state);
  * \return
  */
 MXNET_DLL int MXDumpProfile();
-
-/*!
- * \brief Set whether to continuously write the profiling data to a file
- * \param continuous_dump true to continuously write profiling data to a file
- * \param delay_in_seconds Number of seconds (or fraction of seconds) to delay between writes
- * \return 0 when success, -1 when failure happens.
- */
-MXNET_DLL int MXSetContinuousProfileDump(int continuous_dump, float delay_in_seconds);
 
 /*!
  * \brief Pause profiler tuning collection

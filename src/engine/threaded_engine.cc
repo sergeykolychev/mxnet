@@ -310,11 +310,9 @@ void ThreadedEngine::PushAsync(AsyncFn fn, Context exec_ctx,
   ThreadedOpr *opr = NewOperator(std::move(fn), const_vars, mutable_vars, prop, opr_name);
   opr->temporary = true;
 #if MXNET_USE_PROFILER
-  profiler::Profiler *profiler = profiler::Profiler::Get();
-  const bool profiling = (profiler->GetState() == profiler::Profiler::kRunning) &&
-                         (profiler->GetMode() & profiler::Profiler::kImperative);
+  const bool profiling = profiler::Profiler::Get()->IsProfiling(profiler::Profiler::kImperative);
 #else
-  bool profiling = false;
+  const bool profiling = false;
 #endif
   Push(opr, exec_ctx, priority, profiling);
 }

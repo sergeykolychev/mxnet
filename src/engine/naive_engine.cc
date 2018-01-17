@@ -91,7 +91,7 @@ class NaiveEngine final : public Engine {
   void Push(OprHandle op, Context exec_ctx, int priority = 0, bool profiling = false) override {
     profiler::Profiler *profiler = profiler::Profiler::Get();
     NaiveOpr *opr = op->Cast<NaiveOpr>();
-    opr->profiling = profiling && (profiler->GetMode() & profiler::Profiler::kSymbolic);
+    opr->profiling = profiling && profiler->IsProfiling(profiler::Profiler::kSymbolic);
     this->PushAsync([&](RunContext ctx, CallbackOnComplete on_complete) {
 #if MXNET_USE_PROFILER
         if (opr->profiling) {
@@ -127,9 +127,7 @@ class NaiveEngine final : public Engine {
 #if MXNET_USE_PROFILER
     profiler::Profiler *profiler = profiler::Profiler::Get();
     NaiveOpr *opr = nullptr;
-    bool profiling = (profiler->GetState() == profiler::Profiler::kRunning) &&
-                   (profiler->GetMode() & profiler::Profiler::kImperative) &&
-                   opr_name;
+    const bool profiling = opr_name && profiler->IsProfiling(profiler::Profiler::kImperative);
     if (profiling) {
       opr = NewOperator(exec_fun, const_vars, mutable_vars,
                         prop, opr_name)->Cast<NaiveOpr>();

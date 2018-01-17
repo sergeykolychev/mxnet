@@ -262,13 +262,18 @@ class Profiler {
    * \brief set profiler configuration
    * \param mode flags, one or more of 'ProfilerMode'
    * \param output_filename profile output file name
-   * \param append_mode true if profile information should be appended to the existing file
+   * \param continuous_dump true if profile information should be periodically dumped
+   * \param dump_period Period (in seconds) of profile info dumping
    */
-  void SetConfig(int mode, std::string output_filename, bool append_mode);
+  void SetConfig(int mode, std::string output_filename, bool continuous_dump, float dump_period);
 
   /*! \return mode of profiler */
   inline int GetMode() const {
     return this->mode_;
+  }
+
+  inline bool IsProfiling(const ProfilerMode pm) const {
+    return GetState() == kRunning && (GetMode() & pm) == pm;
   }
 
   /*! \return whether the profiler is enabled to output */
@@ -281,15 +286,8 @@ class Profiler {
    */
   void DumpProfile(bool peform_cleanup = true);
 
-  /*!
-   * \brief Set continuous asynchronous profile dump
-   * \param continuous_dump Whether to continuously dump profile information
-   * \param delay_in_seconds Delay between asynchronous dumps
-   */
-  void SetContinuousProfileDump(bool continuous_dump, float delay_in_seconds = 1.0f);
-
   /*! \return the profiler init time, time unit is microsecond (10^-6) s */
-  inline uint64_t GetInitTime() const {
+  uint64_t MSHADOW_CINLINE GetInitTime() const {
     return init_time_;
   }
   /*!
@@ -316,12 +314,6 @@ class Profiler {
   /*! \return Profiler singleton */
   static Profiler* Get();
 
-  /*!DurationStat
-   * \brief Check the last append mode sent to DumpProfile (false by default)
-   * \return true if profile is in append mode, false if DumpFile() will truncate
-   */
-  bool append_mode() const { return append_profile_; }
-
   /*!
    * \brief Set whether statistic collection is to be paused
    * \param paused true if statistic collection is to be paused, otherwise
@@ -335,7 +327,7 @@ class Profiler {
    * \return Device count
    * \note Number of CPU's + Number of GPU's + One for CPU-Pinned
    */
-  MSHADOW_CINLINE size_t DeviceCount() const { return cpu_num_ + gpu_num_ + 2; }
+  size_t DeviceCount() const { return cpu_num_ + gpu_num_ + 2; }
 
   /*!
    * \brief Compute device index given device type and id
@@ -395,6 +387,13 @@ class Profiler {
   /*! \brief generate device information following chrome profile file format */
   void EmitPid(std::ostream *os, const std::string& name, size_t pid);
 
+  /*!
+   * \brief Set continuous asynchronous profile dump
+   * \param continuous_dump Whether to continuously dump profile information
+   * \param delay_in_seconds Delay between asynchronous dumps
+   */
+  void SetContinuousProfileDump(bool continuous_dump, float delay_in_seconds);
+
   /*! \brief Profiler instance */
   static Profiler* instance_;
   /*! \brief internal mutex of the profiler */
@@ -402,11 +401,11 @@ class Profiler {
   /*! \brief indicate whether the profiler is running */
   ProfilerState state_;
   /*! \brief once running, enable profiler to output */
-  bool enable_output_;
+  volatile bool enable_output_;
   /*! \brief indicate what operator the profiler will record */
-  int mode_;
+  int mode_ = kSymbolic | kAPI | kMemory;
   /*! \brief filename to output profile file */
-  std::string filename_;
+  std::string filename_ = "profile.json";
   /*! \brief profile statistics consist of multiple device statistics */
   DeviceStats* profile_stat;
   /*! \brief Stats not associated directly with a device */
@@ -419,8 +418,8 @@ class Profiler {
   unsigned int gpu_num_;
   /*! \brief the profiler init time */
   uint64_t init_time_;
-  /*! \brief Last profile append mode */
-  volatile bool append_profile_ = false;
+  /*! \brief Continuously dump profile info */
+  volatile bool continuous_dump_ = false;
   /*! \brief Number of non-meta profiling record emitted */
   volatile uint64_t num_records_emitted_ = 0;
   /*! \brief Number of times profile was dumped */
@@ -1106,7 +1105,7 @@ inline void Profiler::AddProfileStat<ProfileOperator::OprExecStat>(
   dev_stat.opr_exec_stats_->enqueue((*opr_stat).release());
 }
 
-#undef VTUNE_ONLY_CODE
+#undef VTUNE_ONLY_CODE  // This macro not meant to be used outside of this file
 
 }  // namespace profiler
 }  // namespace mxnet
