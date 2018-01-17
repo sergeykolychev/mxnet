@@ -16,8 +16,8 @@
  * specific language governing permissions and limitations
  * under the License.
  */
-#ifndef MXNET_STORAGE_STORAGE_PROFILER_H_
-#define MXNET_STORAGE_STORAGE_PROFILER_H_
+#ifndef MXNET_PROFILER_STORAGE_PROFILER_H_
+#define MXNET_PROFILER_STORAGE_PROFILER_H_
 
 #include <mxnet/storage.h>
 #include <string>
@@ -110,4 +110,4 @@ class DeviceStorageProfiler {
 }  // namespace storage
 }  // namespace mxnet
 
-#endif  // MXNET_STORAGE_STORAGE_PROFILER_H_
+#endif  // MXNET_PROFILER_STORAGE_PROFILER_H_

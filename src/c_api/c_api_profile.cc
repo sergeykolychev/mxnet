@@ -181,10 +181,14 @@ struct PythonProfileObjects {
   std::mutex cs_frames_;
   std::mutex cs_events_;
   std::list<std::shared_ptr<profiler::ProfileDomain>> domains_;
-  std::unordered_map<profiler::ProfileCounter *, std::shared_ptr<profiler::ProfileCounter>> counters_;
-  std::unordered_map<profiler::ProfileDuration *, std::shared_ptr<profiler::ProfileDuration>> tasks_;
-  std::unordered_map<profiler::ProfileDuration *, std::shared_ptr<profiler::ProfileDuration>> frames_;
-  std::unordered_map<profiler::ProfileDuration *, std::shared_ptr<profiler::ProfileDuration>> events_;
+  std::unordered_map<profiler::ProfileCounter *, std::shared_ptr<profiler::ProfileCounter>>
+    counters_;
+  std::unordered_map<profiler::ProfileDuration *, std::shared_ptr<profiler::ProfileDuration>>
+    tasks_;
+  std::unordered_map<profiler::ProfileDuration *, std::shared_ptr<profiler::ProfileDuration>>
+    frames_;
+  std::unordered_map<profiler::ProfileDuration *, std::shared_ptr<profiler::ProfileDuration>>
+    events_;
 };
 static PythonProfileObjects python_profile_objects;
 

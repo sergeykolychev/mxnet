@@ -22,8 +22,8 @@
  * \file vtune.h
  * \brief VTune API classes.
  */
-#ifndef MXNET_COMMON_VTUNE_H_
-#define MXNET_COMMON_VTUNE_H_
+#ifndef MXNET_PROFILER_VTUNE_H_
+#define MXNET_PROFILER_VTUNE_H_
 
 #include <string.h>
 #include <dmlc/logging.h>
@@ -320,4 +320,4 @@ class VTuneInstantMarker {
 }  // namespace profiler
 }  // namespace mxnet
 
-#endif  // MXNET_COMMON_VTUNE_H_
+#endif  // MXNET_PROFILER_VTUNE_H_

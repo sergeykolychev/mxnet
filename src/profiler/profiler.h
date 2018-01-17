@@ -22,8 +22,8 @@
  * \file profiler.h
  * \brief implements profiler
  */
-#ifndef MXNET_ENGINE_PROFILER_H_
-#define MXNET_ENGINE_PROFILER_H_
+#ifndef MXNET_PROFILER_PROFILER_H_
+#define MXNET_PROFILER_PROFILER_H_
 
 #include <dmlc/concurrentqueue.h>
 #include <dmlc/thread_group.h>
@@ -1104,6 +1104,6 @@ inline void Profiler::AddProfileStat<ProfileOperator::OprExecStat>(
 
 #undef VTUNE_ONLY_CODE
 
-}  // namespace profile
+}  // namespace profiler
 }  // namespace mxnet
-#endif  // MXNET_ENGINE_PROFILER_H_
+#endif  // MXNET_PROFILER_PROFILER_H_
