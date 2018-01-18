@@ -31,8 +31,10 @@ object Profiler {
    * @param fileName, optional
    *                  The name of output trace file. Default is "profile.json".
    */
-  def profilerSetConfig(mode: String = "symbolic", fileName: String = "profile.json", append_mode: Int = 0): Unit = {
-    checkCall(_LIB.mxSetProfilerConfig(mode, fileName, append_mode))
+  def profilerSetConfig(kwargs: Map[String, String]): Unit = {
+    val keys = kwargs.keys.toArray
+    val vals = kwargs.values.toArray
+    checkCall(_LIB.mxSetProfilerConfig(keys, vals))
   }
 
   /**

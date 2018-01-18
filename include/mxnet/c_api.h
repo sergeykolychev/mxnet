@@ -220,7 +220,7 @@ MXNET_DLL int MXNotifyShutdown();
  * \param vals array of parameter values
  * \return 0 when success, -1 when failure happens.
  */
-MXNET_DLL int MXSetProfilerConfig(int num_params, const char** keys, const char** vals);
+MXNET_DLL int MXSetProfilerConfig(int num_params, const char* const* keys, const char* const* vals);
 
 /*!
  * \brief Set up state of profiler

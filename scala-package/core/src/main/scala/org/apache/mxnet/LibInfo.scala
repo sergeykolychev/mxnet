@@ -315,7 +315,7 @@ private[mxnet] class LibInfo {
   @native def mxCustomOpRegister(regName: String, opProp: CustomOpProp): Int
 
   // Profiler
-  @native def mxSetProfilerConfig(mode: String, fileName: String, append_mode: Int): Int
+  @native def mxSetProfilerConfig(keys: Array[String], vals: Array[String]): Int
   @native def mxSetProfilerState(state: Int): Int
   @native def mxDumpProfile(): Int
 }
