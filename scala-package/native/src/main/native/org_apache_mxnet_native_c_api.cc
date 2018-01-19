@@ -2520,7 +2520,7 @@ struct JNIString {
     str_ = env_->GetStringUTFChars(java_string_, 0);
   }
   inline ~JNIString() {
-    if(str_) {
+    if (str_) {
       env_->ReleaseStringUTFChars(java_string_, str_);
     }
   }
@@ -2536,7 +2536,7 @@ struct JNIStringArray {
     const int count = env->GetArrayLength(stringArray);
     jni_strings_.reserve(count);
     strings_.reserve(count);
-    for(int i = 0; i < count; ++i) {
+    for (int i = 0; i < count; ++i) {
       jstring string = static_cast<jstring>(env->GetObjectArrayElement(stringArray, i));
       jni_strings_.emplace_back(std::unique_ptr<JNIString>(new JNIString(env, string)));
       strings_.emplace_back((*jni_strings_.rbegin())->str_);
@@ -2547,7 +2547,6 @@ struct JNIStringArray {
 
 JNIEXPORT jint JNICALL Java_org_apache_mxnet_LibInfo_mxSetProfilerConfig
   (JNIEnv *env, jobject obj, jobjectArray keys, jobjectArray vals) {
-
   const int stringCount = env->GetArrayLength(keys);
   CHECK_EQ(stringCount, env->GetArrayLength(vals)) << "Key and value arrays must be the same size";
 

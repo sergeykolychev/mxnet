@@ -38,7 +38,7 @@ void ProfilerSetConfig(SEXP params) {
   std::vector<const char*> c_str_vals = CKeys(str_vals);
 
   MX_CALL(MXSetProfilerConfig(static_cast<mx_uint>(str_keys.size()),
-                              dmlc::BeginPtr(c_str_keys),dmlc::BeginPtr(c_str_vals)));
+                              dmlc::BeginPtr(c_str_keys), dmlc::BeginPtr(c_str_vals)));
 }
 
 void ProfilerSetState(int state) {
