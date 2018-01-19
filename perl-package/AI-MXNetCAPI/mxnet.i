@@ -261,14 +261,13 @@ int MXRandomSeed(int seed);
 int MXNotifyShutdown();
 /*!
  * \brief Set up configuration of profiler
- * \param mode indicate the working mode of profiler,
- *  record anly symbolic operator when mode == 0,
- *  record all operator when mode == 1
- * \param filename where to save trace file
- * \param append_mode subsequent calls to MXDumpProfile() append to existing file
+ * \param num_params Number of parameters
+ * \param keys array of parameter keys
+ * \param vals array of parameter values
  * \return 0 when success, -1 when failure happens.
  */
-int MXSetProfilerConfig(const char *mode, const char *filename, int append_mode);
+int MXSetProfilerConfig(int num_params, const char* const* keys, const char* const* vals);
+
 /*!
  * \brief Set up state of profiler
  * \param state indicate the working state of profiler,

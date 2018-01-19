@@ -37,17 +37,23 @@ use AI::MXNet::Function::Parameters;
 
     Parameters
     ----------
-    mode : string, optional
-        Indicting whether to enable the profiler, can
-        be 'symbolic' or 'all'. Default is `symbolic`.
-    filename : string, optional
-        The name of output trace file. Default is
-        'profile.json'.
+    kwargs : hash ref
+        Indicates configuration parameters with key/value pairs, listed below
+          profile_symbolic : boolean, whether to profile symbolic operators
+          profile_imperative : boolean, whether to profile imperative operators
+          profile_memory : boolean, whether to profile memory usage
+          profile_api : boolean, whether to profile the C API
+          file_name : string, output file for profile data
+          continuous_dump : boolean, whether to periodically dump profiling data to file
+          dump_period : float, seconds between profile data dumps
 =cut
 
-method profiler_set_config(Str $mode='symbolic', Str $filename='profile.json', Int $append_mode=0)
+method profiler_set_config(HashRef[Str]:$kwargs)
 {
-    check_call(AI::MXNet::SetProfilerConfig($mode, $filename, $append_mode));
+    my $keys = keys(%{ $kwargs });
+    my $values = values(%{ $kwargs });
+    my $count = 0 + $keys;  # Number of key/value pairs
+    check_call(AI::MXNet::SetProfilerConfig($count, $keys, $values));
 }
 
 =head2 profiler_set_state
