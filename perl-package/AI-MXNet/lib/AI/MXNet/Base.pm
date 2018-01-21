@@ -37,7 +37,7 @@ use List::Util qw(shuffle);
                               STORAGE_TYPE_UNDEFINED STORAGE_TYPE_DEFAULT
                               STORAGE_TYPE_ROW_SPARSE STORAGE_TYPE_CSR
                               STORAGE_TYPE_STR_TO_ID STORAGE_TYPE_ID_TO_STR STORAGE_AUX_TYPES);
-@AI::MXNet::Base::EXPORT_OK = qw(pzeros pceil);
+@AI::MXNet::Base::EXPORT_OK = qw(pzeros pceil pones);
 
 use constant DTYPE_STR_TO_MX => {
     float32 => 0,
@@ -375,6 +375,7 @@ END {
 }
 
 *pzeros = \&zeros;
+*pones = \&ones;
 *pceil  = \&ceil;
 ## making sure that we can stringify arbitrarily large piddles
 $PDL::toolongtoprint = 1000_000_000;

@@ -300,8 +300,13 @@ use overload '+=' => sub { ($_[0] + $_[1])->copyto($_[0]) },
         [[ 4  5  6]]
 =cut
 
-method slice(Slice $slice)
+method slice(Slice|InternalSlice @slices)
 {
+    if(grep { /^begin|end|slice$/ } @slices)
+    {
+        return $self->SUPER::slice(@slices);
+    }
+    my $slice = $slices[0];
     my ($begin, $end);
     if(not ref $slice)
     {
@@ -313,14 +318,14 @@ method slice(Slice $slice)
         {
             $begin = $slice;
         }
-        $end = $begin + 1;
+        $end = $begin;
     }
     else
     {
         ($begin, $end) = @{ $slice };
-        $end //= $self->shape->[0];
+        $end //= $self->shape->[0] - 1;
     }
-    return $self->SUPER::slice(begin => $begin, end => $end);
+    return $self->SUPER::slice(begin => $begin, end => $end + 1);
 }
 
 
@@ -356,7 +361,7 @@ method slice(Slice $slice)
                [ 2  2  2]]
 =cut
 
-method set(CSRSetInput $other)
+method set(AcceptableInput $other, $reverse=)
 {
     confess('Failed to assign to a readonly CSR') unless $self->writable;
     if($other->isa('AI::MXNet::NDArray'))
@@ -368,7 +373,7 @@ method set(CSRSetInput $other)
     }
     else
     {
-        my $tmp = __PACKAGE__->_array($other);
+        my $tmp = __PACKAGE__->_array($other, ((not ref $other) ? ( pdl => $self->aspdl) : ()));
         $tmp->copyto($self);
     }
 }
@@ -601,9 +606,9 @@ method slice(@args) { confess("not implemented") }
                [ 2  2  2]]
 =cut
 
-method set(RowSparseSetInput $other)
+method set(AcceptableInput $other, $reverse=)
 {
-    confess('Failed to assign to a readonly CSR') unless $self->writable;
+    confess('Failed to assign to a readonly RowSparse') unless $self->writable;
     if($other->isa('AI::MXNet::NDArray'))
     {
         if($self->handle ne $other->handle)
@@ -613,7 +618,7 @@ method set(RowSparseSetInput $other)
     }
     else
     {
-        my $tmp = __PACKAGE__->_array($other);
+        my $tmp = __PACKAGE__->_array($other, ((not ref $other) ? ( pdl => $self->aspdl) : ()));
         $tmp->copyto($self);
     }
 }
@@ -1173,13 +1178,13 @@ method zeros(
     {
         confess("unknown storage type: $stype");
     }
-    my $out = __PACKAGE__->_ndarray_cls(
+    $out //= __PACKAGE__->_ndarray_cls(
         __PACKAGE__->_new_alloc_handle(
             $stype, $shape, $ctx, 1, $dtype, $aux_types)
     );
     return __PACKAGE__->_zeros(
         shape => $shape, ctx => $ctx, dtype => $dtype, out => $out,
-        ($name ? (name => $name) : ()), ($__layout__ ? (__layout__ => $__layout__) : ())
+        ($__layout__ ? (__layout__ => $__layout__) : ())
     );
 }
 
@@ -1251,11 +1256,17 @@ method empty(
 method _array(
     AcceptableInput $source_array,
     Maybe[AI::MXNet::Context] :$ctx=AI::MXNet::Context->current_ctx,
-    Maybe[Dtype] :$dtype='float32'
+    Maybe[Dtype] :$dtype='float32',
+    Maybe[PDL] :$pdl=
 )
 {
-    if(not blessed $source_array or $source_array->isa('PDL'))
+    if(not blessed $source_array  or $source_array->isa('PDL'))
     {
+        if(not ref $source_array)
+        {
+            $pdl .= $source_array;
+            $source_array = $pdl;
+        }
         return __PACKAGE__->array($source_array, ctx => $ctx, dtype => $dtype);
     }
     if($source_array->isa('AI::MXNet::NDArray'))

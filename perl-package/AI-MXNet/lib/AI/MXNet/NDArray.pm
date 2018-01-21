@@ -958,14 +958,21 @@ method imodulo(AI::MXNet::NDArray|Num $other, $reverse=)
     :$dtype : Dtype, optional
         The dtype of the NDArray, defaults to 'float32'.
 
+    :$stype: Stype, optional
+        The stype of the NDArray, defaults to 'default'
+
     Returns
     -------
     out: Array
         The created NDArray.
 =cut
 
-method empty(Shape $shape, AI::MXNet::Context :$ctx=AI::MXNet::Context->current_ctx, Dtype :$dtype='float32')
+method empty(Shape $shape, AI::MXNet::Context :$ctx=AI::MXNet::Context->current_ctx, Dtype :$dtype='float32', Stype :$stype='default')
 {
+    if($stype ne 'default')
+    {
+        return AI::MXNet::NDArray::Sparse->empty($stype, $shape, ctx => $ctx, dtype => $dtype);
+    }
     return __PACKAGE__->new(
                 handle => _new_alloc_handle(
                     $shape,
@@ -991,6 +998,8 @@ method empty(Shape $shape, AI::MXNet::Context :$ctx=AI::MXNet::Context->current_
     :$dtype : Dtype, optional
         The dtype of the NDArray, defaults to 'float32'.
 
+    :$stype: Stype, optional
+        The stype of the NDArray, defaults to 'default'
     Returns
     -------
     out: Array
@@ -1007,6 +1016,10 @@ method zeros(
     Stype :$stype='default'
 )
 {
+    if($stype ne 'default')
+    {
+        return AI::MXNet::NDArray::Sparse->zeros($stype, $shape, ctx => $ctx, dtype => $dtype, out => $out);
+    }
     return __PACKAGE__->_zeros({ shape => $shape, ctx => "$ctx", dtype => $dtype, ($out ? (out => $out) : ())  });
 }
 
@@ -1037,7 +1050,7 @@ method ones(
     Dtype :$dtype='float32',
     Maybe[AI::MXNet::NDArray] :$out=,
     Maybe[Str] :$name=,
-    Maybe[Str] :$__layout__=
+    Maybe[Str] :$__layout__=,
 )
 {
     return __PACKAGE__->_ones({ shape => $shape, ctx => "$ctx", dtype => $dtype, ($out ? (out => $out) : ()) });

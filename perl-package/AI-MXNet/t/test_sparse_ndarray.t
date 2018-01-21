@@ -18,9 +18,12 @@
 use lib '../lib';
 use strict;
 use warnings;
+use Scalar::Util qw(blessed);
 use Test::More 'no_plan';
 use AI::MXNet qw(mx);
-use AI::MXNet::TestUtils qw(zip assert enumerate rand_shape_2d rand_shape_3d rand_sparse_ndarray random_arrays almost_equal rand_ndarray);
+use AI::MXNet::TestUtils qw(zip assert enumerate same rand_shape_2d rand_shape_3d
+    rand_sparse_ndarray random_arrays almost_equal rand_ndarray randint);
+use AI::MXNet::Base qw(pones);
 $ENV{MXNET_STORAGE_FALLBACK_LOG_VERBOSE} = 0;
 use Data::Dumper;
 sub sparse_nd_ones
@@ -112,51 +115,60 @@ sub test_sparse_nd_basic
 
 test_sparse_nd_basic();
 
-__END__
+sub test_sparse_nd_setitem
+{
+    my $check_sparse_nd_setitem = sub { my ($stype, $shape, $dst) = @_;
+        my $x = mx->nd->zeros($shape, stype=>$stype);
+        $x .= $dst;
+        my $dst_nd = (blessed $dst and $dst->isa('PDL')) ? mx->nd->array($dst) : $dst;
+        ok(($x->aspdl == (ref $dst_nd ? $dst_nd->aspdl : $dst_nd))->all);
+    };
 
-def test_sparse_nd_setitem():
-    def check_sparse_nd_setitem(stype, shape, dst):
-        x = mx.nd.zeros(shape=shape, stype=stype)
-        x[:] = dst
-        dst_nd = mx.nd.array(dst) if isinstance(dst, (np.ndarray, np.generic)) else dst
-        assert np.all(x.asnumpy() == dst_nd.asnumpy() if isinstance(dst_nd, NDArray) else dst)
-
-    shape = rand_shape_2d()
-    for stype in ['row_sparse', 'csr']:
+    my $shape = rand_shape_2d();
+    for my $stype ('row_sparse', 'csr')
+    {
         # ndarray assignment
-        check_sparse_nd_setitem(stype, shape, rand_ndarray(shape, 'default'))
-        check_sparse_nd_setitem(stype, shape, rand_ndarray(shape, stype))
+        $check_sparse_nd_setitem->($stype, $shape, rand_ndarray($shape, 'default'));
+        $check_sparse_nd_setitem->($stype, $shape, rand_ndarray($shape, $stype));
         # numpy assignment
-        check_sparse_nd_setitem(stype, shape, np.ones(shape))
+        $check_sparse_nd_setitem->($stype, $shape, pones(reverse @{ $shape }));
+    }
     # scalar assigned to row_sparse NDArray
-    check_sparse_nd_setitem('row_sparse', shape, 2)
+    $check_sparse_nd_setitem->('row_sparse', $shape, 2);
+}
 
-def test_sparse_nd_slice():
-    shape = (rnd.randint(2, 10), rnd.randint(2, 10))    
-    stype = 'csr'
-    A, _ = rand_sparse_ndarray(shape, stype)
-    A2 = A.asnumpy()
-    start = rnd.randint(0, shape[0] - 1)
-    end = rnd.randint(start + 1, shape[0])
-    assert same(A[start:end].asnumpy(), A2[start:end])
-    assert same(A[start - shape[0]:end].asnumpy(), A2[start:end])
-    assert same(A[start:].asnumpy(), A2[start:])
-    assert same(A[:end].asnumpy(), A2[:end])
-    ind = rnd.randint(-shape[0], shape[0] - 1)
-    assert same(A[ind].asnumpy(), A2[ind][np.newaxis, :])
-        
-    start_col = rnd.randint(0, shape[1] - 1)
-    end_col = rnd.randint(start_col + 1, shape[1])
-    result = mx.nd.slice(A, begin=(start, start_col), end=(end, end_col))
-    result_dense = mx.nd.slice(mx.nd.array(A2), begin=(start, start_col), end=(end, end_col))
-    assert same(result_dense.asnumpy(), result.asnumpy())
-    
-    A = mx.nd.sparse.zeros('csr', shape)
-    A2 = A.asnumpy()
-    assert same(A[start:end].asnumpy(), A2[start:end])
-    result = mx.nd.slice(A, begin=(start, start_col), end=(end, end_col))
-    result_dense = mx.nd.slice(mx.nd.array(A2), begin=(start, start_col), end=(end, end_col))
-    assert same(result_dense.asnumpy(), result.asnumpy())
+test_sparse_nd_setitem();
+
+sub test_sparse_nd_slice
+{
+    my $shape = [randint(2, 10), randint(2, 10)];
+    my $stype = 'csr';
+    my ($A) = rand_sparse_ndarray($shape, $stype);
+    my $A2 = $A->aspdl;
+    my $start = randint(0, $shape->[0] - 1);
+    my $end = randint($start + 1, $shape->[0]);
+    ok(same($A->slice([$start, $end])->aspdl, $A2->slice('X', [$start, $end])));
+    ok(same($A->slice([$start - $shape->[0], $end])->aspdl, $A2->slice('X', [$start, $end])));
+    ok(same($A->slice([$start, $shape->[0] - 1])->aspdl, $A2->slice('X', [$start, $shape->[0]-1])));
+    ok(same($A->slice([0, $end])->aspdl, $A2->slice('X', [0, $end])));
+
+    my $start_col = randint(0, $shape->[1] - 1);
+    my $end_col = randint($start_col + 1, $shape->[1]);
+    my $result = $A->slice(begin=>[$start, $start_col], end=>[$end, $end_col]);
+    my $result_dense = mx->nd->array($A2)->slice(begin=>[$start, $start_col], end=>[$end, $end_col]);
+    ok(same($result_dense->aspdl, $result->aspdl));
+
+    $A = mx->nd->sparse->zeros('csr', $shape);
+    $A2 = $A->aspdl;
+    ok(same($A->slice([$start, $end])->aspdl, $A2->slice('X', [$start, $end])));
+    $result = $A->slice(begin=>[$start, $start_col], end=>[$end, $end_col]);
+    $result_dense = mx->nd->array($A2)->slice(begin=>[$start, $start_col], end=>[$end, $end_col]);
+    ok(same($result_dense->aspdl, $result->aspdl));
+}
+
+test_sparse_nd_slice();
+
+__END__
 
     def check_slice_nd_csr_fallback(shape):
         stype = 'csr'

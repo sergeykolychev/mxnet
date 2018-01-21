@@ -29,7 +29,7 @@ use base qw(Exporter);
 @AI::MXNet::TestUtils::EXPORT_OK = qw(same reldiff almost_equal GetMNIST_ubyte
                                       GetCifar10 pdl_maximum pdl_minimum mlp2 conv
                                       check_consistency zip assert enumerate same_array dies_like allclose rand_shape_2d
-                                      rand_shape_3d rand_sparse_ndarray random_arrays rand_ndarray);
+                                      rand_shape_3d rand_sparse_ndarray random_arrays rand_ndarray randint);
 use constant default_numerical_threshold => 1e-6;
 =head1 NAME
 
@@ -811,6 +811,12 @@ func rand_shape_3d($dim0=10, $dim1=10, $dim2=10)
 func rand_shape_nd($num_dim, $dim=10)
 {
     (random($num_dim)*$dim+1)->floor->unpdl;
+}
+
+func randint($low=0, $high=10)
+{
+    my $value = int(rand($high));
+    return $value < $low ? $low : $value;
 }
 
 1;
