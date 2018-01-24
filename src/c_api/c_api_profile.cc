@@ -201,6 +201,7 @@ static void warn_not_built_with_profiler_enabled() {
 #endif  // MXNET_USE_PROFILER
 
 struct ProfileConfigParam : public dmlc::Parameter<ProfileConfigParam> {
+  bool profile_all;
   bool profile_symbolic;
   bool profile_imperative;
   bool profile_memory;
@@ -209,6 +210,8 @@ struct ProfileConfigParam : public dmlc::Parameter<ProfileConfigParam> {
   bool continuous_dump;
   float dump_period;
   DMLC_DECLARE_PARAMETER(ProfileConfigParam) {
+    DMLC_DECLARE_FIELD(profile_all).set_default(false)
+      .describe("Profile all.");
     DMLC_DECLARE_FIELD(profile_symbolic).set_default(true)
       .describe("Profile symbolic operators.");
     DMLC_DECLARE_FIELD(profile_imperative).set_default(true)
@@ -258,10 +261,10 @@ int MXSetProfilerConfig(int num_params, const char* const* keys, const char* con
     ProfileConfigParam param;
     param.Init(kwargs);
     int mode = 0;
-    if (param.profile_api)        { mode |= profiler::Profiler::kAPI; }
-    if (param.profile_symbolic)   { mode |= profiler::Profiler::kSymbolic; }
-    if (param.profile_imperative) { mode |= profiler::Profiler::kImperative; }
-    if (param.profile_memory)     { mode |= profiler::Profiler::kMemory; }
+    if (param.profile_api || param.profile_all)        { mode |= profiler::Profiler::kAPI; }
+    if (param.profile_symbolic || param.profile_all)   { mode |= profiler::Profiler::kSymbolic; }
+    if (param.profile_imperative || param.profile_all) { mode |= profiler::Profiler::kImperative; }
+    if (param.profile_memory || param.profile_all)     { mode |= profiler::Profiler::kMemory; }
     profiler::Profiler::Get()->SetConfig(profiler::Profiler::ProfilerMode(mode),
                                          std::string(param.file_name),
                                          param.continuous_dump,

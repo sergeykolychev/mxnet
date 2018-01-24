@@ -30,6 +30,7 @@ def profiler_set_config(flags):
     ----------
     flags : list of key/value pair tuples
         Indicates configuration parameters
+          profile_all : boolean, all profile types enabled
           profile_symbolic : boolean, whether to profile symbolic operators
           profile_imperative : boolean, whether to profile imperative operators
           profile_memory : boolean, whether to profile memory usage
