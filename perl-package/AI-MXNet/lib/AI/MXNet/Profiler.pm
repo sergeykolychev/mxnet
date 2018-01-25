@@ -59,15 +59,14 @@ method profiler_set_config(HashRef[Str] :$kwargs)
 
     Parameters
     ----------
-    state : string, optional
+    state : int, optional
         Indicting whether to run the profiler, can
-        be 'stop' or 'run'. Default is `stop`.
+        be 'stop' - 0 or 'run' - 1. Default is `stop`.
 =cut
 
-method profiler_set_state(ProfilerState $state='stop')
+method profiler_set_state(Int $state)
 {
-    my %state2int = qw/stop 0 run 1/;
-    check_call(AI::MXNet::SetProfilerState($state2int{ $state }));
+    check_call(AI::MXNet::SetProfilerState($state));
 }
 
 =head2 dump_profile
