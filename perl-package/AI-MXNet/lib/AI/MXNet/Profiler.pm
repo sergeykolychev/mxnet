@@ -48,7 +48,7 @@ use AI::MXNet::Function::Parameters;
           dump_period : float, seconds between profile data dumps
 =cut
 
-method profiler_set_config(HashRef[Str] :$kwargs)
+method profiler_set_config(HashRef[Str] $kwargs)
 {
     check_call(AI::MXNet::SetProfilerConfig(scalar(keys %{ $kwargs }), $kwargs));
 }
