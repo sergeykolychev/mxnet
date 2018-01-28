@@ -138,8 +138,8 @@ method aspdl()
 method astype(Dtype $dtype)
 {
     my $res = $self->zeros(
-        shape => $self->shape, ctx => $self->context,
-        dtype => $dtype, stype => $self->stype
+        $self->stype, $self->shape, ctx => $self->context,
+        dtype => $dtype
     );
     $self->copyto($res);
     return $res;

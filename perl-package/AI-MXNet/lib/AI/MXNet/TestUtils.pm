@@ -60,9 +60,9 @@ func same(PDL $a, PDL $b)
     b : pdl
 =cut
 
-func allclose(PDL $a, PDL $b)
+func allclose(PDL $a, PDL $b, Maybe[Num] $threshold=)
 {
-    return (($a - $b)->abs <= default_numerical_threshold)->all;
+    return (($a - $b)->abs <= ($threshold//default_numerical_threshold))->all;
 }
 
 =head2 reldiff

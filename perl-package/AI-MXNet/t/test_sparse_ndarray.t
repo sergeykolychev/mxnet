@@ -22,8 +22,8 @@ use Scalar::Util qw(blessed);
 use Test::More 'no_plan';
 use AI::MXNet qw(mx);
 use AI::MXNet::TestUtils qw(zip assert enumerate same rand_shape_2d rand_shape_3d
-    rand_sparse_ndarray random_arrays almost_equal rand_ndarray randint);
-use AI::MXNet::Base qw(pones);
+    rand_sparse_ndarray random_arrays almost_equal rand_ndarray randint allclose);
+use AI::MXNet::Base qw(pones pzeros pdl product);
 $ENV{MXNET_STORAGE_FALLBACK_LOG_VERBOSE} = 0;
 use Data::Dumper;
 sub sparse_nd_ones
@@ -164,294 +164,371 @@ sub test_sparse_nd_slice
     $result = $A->slice(begin=>[$start, $start_col], end=>[$end, $end_col]);
     $result_dense = mx->nd->array($A2)->slice(begin=>[$start, $start_col], end=>[$end, $end_col]);
     ok(same($result_dense->aspdl, $result->aspdl));
+
+    my $check_slice_nd_csr_fallback = sub { my ($shape) = @_;
+        my $stype = 'csr';
+        my ($A) = rand_sparse_ndarray($shape, $stype);
+        my $A2 = $A->aspdl;
+        my $start = randint(0, $shape->[0] - 1);
+        my $end = randint($start + 1, $shape->[0]);
+
+        # non-trivial step should fallback to dense slice op
+        my $result = $A->slice(begin=>[$start], end=>[$end+1], step=>[2]);
+        my $result_dense = mx->nd->array($A2)->slice(begin=>[$start], end=>[$end + 1], step=>[2]);
+        ok(same($result_dense->aspdl, $result->aspdl));
+    };
+    $shape = [randint(2, 10), randint(1, 10)];
+    $check_slice_nd_csr_fallback->($shape);
 }
 
 test_sparse_nd_slice();
 
-__END__
+sub test_sparse_nd_equal
+{
+    for my $stype ('row_sparse', 'csr')
+    {
+        my $shape = rand_shape_2d();
+        my $x = mx->nd->zeros($shape, stype=>$stype);
+        my $y = sparse_nd_ones($shape, $stype);
+        my $z = $x == $y;
+        ok(($z->aspdl == pzeros(reverse @{ $shape }))->all);
+        $z = 0 == $x;
+        ok(($z->aspdl == pones(reverse @{ $shape }))->all);
+    }
+}
 
-    def check_slice_nd_csr_fallback(shape):
-        stype = 'csr'
-        A, _ = rand_sparse_ndarray(shape, stype)
-        A2 = A.asnumpy()
-        start = rnd.randint(0, shape[0] - 1)
-        end = rnd.randint(start + 1, shape[0])
+test_sparse_nd_equal();
 
-        # non-trivial step should fallback to dense slice op
-        result = mx.nd.sparse.slice(A, begin=(start,), end=(end + 1,), step=(2,))
-        result_dense = mx.nd.slice(mx.nd.array(A2), begin=(start,), end=(end + 1,), step=(2,))
-        assert same(result_dense.asnumpy(), result.asnumpy())
+sub test_sparse_nd_not_equal
+{
+    for my $stype ('row_sparse', 'csr')
+    {
+        my $shape = rand_shape_2d();
+        my $x = mx->nd->zeros($shape, stype=>$stype);
+        my $y = sparse_nd_ones($shape, $stype);
+        my $z = $x != $y;
+        ok(($z->aspdl == pones(reverse @{ $shape }))->all);
+        $z = 0 != $x;
+        ok(($z->aspdl == pzeros(reverse @{ $shape }))->all);
+    }
+}
 
-    shape = (rnd.randint(2, 10), rnd.randint(1, 10))
-    check_slice_nd_csr_fallback(shape)
+test_sparse_nd_not_equal();
 
+sub test_sparse_nd_greater
+{
+    for my $stype ('row_sparse', 'csr')
+    {
+        my $shape = rand_shape_2d();
+        my $x = mx->nd->zeros($shape, stype=>$stype);
+        my $y = sparse_nd_ones($shape, $stype);
+        my $z = $x > $y;
+        ok(($z->aspdl == pzeros(reverse @{ $shape }))->all);
+        $z = $y > 0;
+        ok(($z->aspdl == pones(reverse @{ $shape }))->all);
+        $z = 0 > $y;
+        ok(($z->aspdl == pzeros(reverse @{ $shape }))->all);
+    }
+}
 
-def test_sparse_nd_equal():
-    for stype in ['row_sparse', 'csr']:
-        shape = rand_shape_2d()
-        x = mx.nd.zeros(shape=shape, stype=stype)
-        y = sparse_nd_ones(shape, stype)
-        z = x == y
-        assert (z.asnumpy() == np.zeros(shape)).all()
-        z = 0 == x
-        assert (z.asnumpy() == np.ones(shape)).all()
+test_sparse_nd_greater();
 
+sub test_sparse_nd_greater_equal
+{
+    for my $stype ('row_sparse', 'csr')
+    {
+        my $shape = rand_shape_2d();
+        my $x = mx->nd->zeros($shape, stype=>$stype);
+        my $y = sparse_nd_ones($shape, $stype);
+        my $z = $x >= $y;
+        ok(($z->aspdl == pzeros(reverse @{ $shape }))->all);
+        $z = $y >= 0;
+        ok(($z->aspdl == pones(reverse @{ $shape }))->all);
+        $z = 0 >= $y;
+        ok(($z->aspdl == pzeros(reverse @{ $shape }))->all);
+        $z = $y >= 1;
+        ok(($z->aspdl == pones(reverse @{ $shape }))->all);
+    }
+}
 
-def test_sparse_nd_not_equal():
-    for stype in ['row_sparse', 'csr']:
-        shape = rand_shape_2d()
-        x = mx.nd.zeros(shape=shape, stype=stype)
-        y = sparse_nd_ones(shape, stype)
-        z = x != y
-        assert (z.asnumpy() == np.ones(shape)).all()
-        z = 0 != x
-        assert (z.asnumpy() == np.zeros(shape)).all()
+test_sparse_nd_greater_equal();
 
+sub test_sparse_nd_lesser
+{
+    for my $stype ('row_sparse', 'csr')
+    {
+        my $shape = rand_shape_2d();
+        my $x = mx->nd->zeros($shape, stype=>$stype);
+        my $y = sparse_nd_ones($shape, $stype);
+        my $z = $y < $x;
+        ok(($z->aspdl == pzeros(reverse @{ $shape }))->all);
+        $z = 0 < $y;
+        ok(($z->aspdl == pones(reverse @{ $shape }))->all);
+        $z = $y < 0;
+        ok(($z->aspdl == pzeros(reverse @{ $shape }))->all);
+    }
+}
 
-def test_sparse_nd_greater():
-    for stype in ['row_sparse', 'csr']:
-        shape = rand_shape_2d()
-        x = mx.nd.zeros(shape=shape, stype=stype)
-        y = sparse_nd_ones(shape, stype)
-        z = x > y
-        assert (z.asnumpy() == np.zeros(shape)).all()
-        z = y > 0
-        assert (z.asnumpy() == np.ones(shape)).all()
-        z = 0 > y
-        assert (z.asnumpy() == np.zeros(shape)).all()
+test_sparse_nd_lesser();
 
+sub test_sparse_nd_lesser_equal
+{
+    for my $stype ('row_sparse', 'csr')
+    {
+        my $shape = rand_shape_2d();
+        my $x = mx->nd->zeros($shape, stype=>$stype);
+        my $y = sparse_nd_ones($shape, $stype);
+        my $z = $y <= $x;
+        ok(($z->aspdl == pzeros(reverse @{ $shape }))->all);
+        $z = 0 <= $y;
+        ok(($z->aspdl == pones(reverse @{ $shape }))->all);
+        $z = $y <= 0;
+        ok(($z->aspdl == pzeros(reverse @{ $shape }))->all);
+        $z = 1 <= $y;
+        ok(($z->aspdl == pones(reverse @{ $shape }))->all);
+    }
+}
 
-def test_sparse_nd_greater_equal():
-    for stype in ['row_sparse', 'csr']:
-        shape = rand_shape_2d()
-        x = mx.nd.zeros(shape=shape, stype=stype)
-        y = sparse_nd_ones(shape, stype)
-        z = x >= y
-        assert (z.asnumpy() == np.zeros(shape)).all()
-        z = y >= 0
-        assert (z.asnumpy() == np.ones(shape)).all()
-        z = 0 >= y
-        assert (z.asnumpy() == np.zeros(shape)).all()
-        z = y >= 1
-        assert (z.asnumpy() == np.ones(shape)).all()
+test_sparse_nd_lesser_equal();
 
-
-def test_sparse_nd_lesser():
-    for stype in ['row_sparse', 'csr']:
-        shape = rand_shape_2d()
-        x = mx.nd.zeros(shape=shape, stype=stype)
-        y = sparse_nd_ones(shape, stype)
-        z = y < x
-        assert (z.asnumpy() == np.zeros(shape)).all()
-        z = 0 < y
-        assert (z.asnumpy() == np.ones(shape)).all()
-        z = y < 0
-        assert (z.asnumpy() == np.zeros(shape)).all()
-
-
-def test_sparse_nd_lesser_equal():
-    for stype in ['row_sparse', 'csr']:
-        shape = rand_shape_2d()
-        x = mx.nd.zeros(shape=shape, stype=stype)
-        y = sparse_nd_ones(shape, stype)
-        z = y <= x
-        assert (z.asnumpy() == np.zeros(shape)).all()
-        z = 0 <= y
-        assert (z.asnumpy() == np.ones(shape)).all()
-        z = y <= 0
-        assert (z.asnumpy() == np.zeros(shape)).all()
-        z = 1 <= y
-        assert (z.asnumpy() == np.ones(shape)).all()
-
-
-def test_sparse_nd_binary():
-    N = 3
-    def check_binary(fn, stype):
-        for _ in range(N):
-            ndim = 2
-            oshape = np.random.randint(1, 6, size=(ndim,))
-            bdim = 2
-            lshape = list(oshape)
+sub test_sparse_nd_binary
+{
+    my $N = 2;
+    my $check_binary = sub { my ($fn, $stype) = @_;
+        for (0 .. 2)
+        {
+            my $ndim = 2;
+            my $oshape = [map { randint(1, 6) } 1..$ndim];
+            my $bdim = 2;
+            my @lshape = @$oshape;
             # one for broadcast op, another for elemwise op
-            rshape = list(oshape[ndim-bdim:])
-            for i in range(bdim):
-                sep = np.random.uniform(0, 1)
-                if sep < 0.33:
-                    lshape[ndim-i-1] = 1
-                elif sep < 0.66:
-                    rshape[bdim-i-1] = 1
-            lhs = np.random.uniform(0, 1, size=lshape)
-            rhs = np.random.uniform(0, 1, size=rshape)
-            lhs_nd = mx.nd.array(lhs).tostype(stype)
-            rhs_nd = mx.nd.array(rhs).tostype(stype)
-            assert_allclose(fn(lhs, rhs), fn(lhs_nd, rhs_nd).asnumpy(), rtol=1e-4, atol=1e-4)
+            my @rshape = @lshape[($ndim-$bdim)..@lshape-1];
+            for my $i (0..$bdim-1)
+            {
+                my $sep = mx->nd->random->uniform(0, 1)->asscalar;
+                if($sep < 0.33)
+                {
+                    $lshape[$ndim-$i-1] = 1;
+                }
+                elsif($sep < 0.66)
+                {
+                    $rshape[$bdim-$i-1] = 1;
+                }
+            }
+            my $lhs = mx->nd->random->uniform(0, 1, shape=>\@lshape)->aspdl;
+            my $rhs = mx->nd->random->uniform(0, 1, shape=>\@rshape)->aspdl;
+            my $lhs_nd = mx->nd->array($lhs)->tostype($stype);
+            my $rhs_nd = mx->nd->array($rhs)->tostype($stype);
+            ok(allclose($fn->($lhs, $rhs), $fn->($lhs_nd, $rhs_nd)->aspdl, 1e-4));
+        }
+    };
+    for my $stype ('row_sparse', 'csr')
+    {
+        $check_binary->(sub { $_[0] +  $_[1] }, $stype);
+        $check_binary->(sub { $_[0] -  $_[1] }, $stype);
+        $check_binary->(sub { $_[0] *  $_[1] }, $stype);
+        $check_binary->(sub { $_[0] /  $_[1] }, $stype);
+        $check_binary->(sub { $_[0] ** $_[1] }, $stype);
+        $check_binary->(sub { $_[0] >  $_[1] }, $stype);
+        $check_binary->(sub { $_[0] <  $_[1] }, $stype);
+        $check_binary->(sub { $_[0] >= $_[1] }, $stype);
+        $check_binary->(sub { $_[0] <= $_[1] }, $stype);
+        $check_binary->(sub { $_[0] == $_[1] }, $stype);
+    }
+}
 
-    stypes = ['row_sparse', 'csr']
-    for stype in stypes:
-        check_binary(lambda x, y: x + y, stype)
-        check_binary(lambda x, y: x - y, stype)
-        check_binary(lambda x, y: x * y, stype)
-        check_binary(lambda x, y: x / y, stype)
-        check_binary(lambda x, y: x ** y, stype)
-        check_binary(lambda x, y: x > y, stype)
-        check_binary(lambda x, y: x < y, stype)
-        check_binary(lambda x, y: x >= y, stype)
-        check_binary(lambda x, y: x <= y, stype)
-        check_binary(lambda x, y: x == y, stype)
+test_sparse_nd_binary();
 
+sub test_sparse_nd_binary_scalar_op
+{
+    my $N = 3;
+    my $check = sub { my ($fn, $stype) = @_;
+        for (1..$N)
+        {
+            my $ndim = 2;
+            my $shape = [map { randint(1, 6) } 1..$ndim];
+            my $npy = mx->nd->random->normal(0, 1, shape=>$shape)->aspdl;
+            my $nd = mx->nd->array($npy)->tostype($stype);
+            ok(allclose($fn->($npy), $fn->($nd)->aspdl, 1e-4));
+        }
+    };
+    for my $stype ('row_sparse', 'csr')
+    {
+        $check->(sub { 1 +    $_[0] }, $stype);
+        $check->(sub { 1 -    $_[0] }, $stype);
+        $check->(sub { 1 *    $_[0] }, $stype);
+        $check->(sub { 1 /    $_[0] }, $stype);
+        $check->(sub { 2 **   $_[0] }, $stype);
+        $check->(sub { 1 >    $_[0] }, $stype);
+        $check->(sub { 0.5 >  $_[0] }, $stype);
+        $check->(sub { 0.5 <  $_[0] }, $stype);
+        $check->(sub { 0.5 >= $_[0] }, $stype);
+        $check->(sub { 0.5 <= $_[0] }, $stype);
+        $check->(sub { 0.5 == $_[0] }, $stype);
+        $check->(sub { $_[0] / 2    }, $stype);
+    }
+}
 
-def test_sparse_nd_binary_scalar_op():
-    N = 3
-    def check(fn, stype):
-        for _ in range(N):
-            ndim = 2
-            shape = np.random.randint(1, 6, size=(ndim,))
-            npy = np.random.normal(0, 1, size=shape)
-            nd = mx.nd.array(npy).tostype(stype)
-            assert_allclose(fn(npy), fn(nd).asnumpy(), rtol=1e-4, atol=1e-4)
+test_sparse_nd_binary_scalar_op();
 
-    stypes = ['row_sparse', 'csr']
-    for stype in stypes:
-        check(lambda x: 1 + x, stype)
-        check(lambda x: 1 - x, stype)
-        check(lambda x: 1 * x, stype)
-        check(lambda x: 1 / x, stype)
-        check(lambda x: 2 ** x, stype)
-        check(lambda x: 1 > x, stype)
-        check(lambda x: 0.5 > x, stype)
-        check(lambda x: 0.5 < x, stype)
-        check(lambda x: 0.5 >= x, stype)
-        check(lambda x: 0.5 <= x, stype)
-        check(lambda x: 0.5 == x, stype)
-        check(lambda x: x / 2, stype)
+sub test_sparse_nd_binary_iop
+{
+    my $N = 3;
+    my $check_binary = sub { my ($fn, $stype) = @_;
+        for (1..$N)
+        {
+            my $ndim = 2;
+            my $oshape = [map { randint(1, 6) } 1..$ndim];
+            my $lhs = mx->nd->random->uniform(0, 1, shape => $oshape)->aspdl;
+            my $rhs = mx->nd->random->uniform(0, 1, shape => $oshape)->aspdl;
+            my $lhs_nd = mx->nd->array($lhs)->tostype($stype);
+            my $rhs_nd = mx->nd->array($rhs)->tostype($stype);
+            ok(
+                allclose(
+                    $fn->($lhs, $rhs),
+                    $fn->($lhs_nd, $rhs_nd)->aspdl,
+                    1e-4
+                )
+            );
+        }
+    };
 
-def test_sparse_nd_binary_iop():
-    N = 3
-    def check_binary(fn, stype):
-        for _ in range(N):
-            ndim = 2
-            oshape = np.random.randint(1, 6, size=(ndim,))
-            lshape = list(oshape)
-            rshape = list(oshape)
-            lhs = np.random.uniform(0, 1, size=lshape)
-            rhs = np.random.uniform(0, 1, size=rshape)
-            lhs_nd = mx.nd.array(lhs).tostype(stype)
-            rhs_nd = mx.nd.array(rhs).tostype(stype)
-            assert_allclose(fn(lhs, rhs),
-                            fn(lhs_nd, rhs_nd).asnumpy(),
-                            rtol=1e-4, atol=1e-4)
+    my $inplace_add = sub { my ($x, $y) = @_;
+        $x += $y;
+        return $x
+    };
+    my $inplace_mul = sub { my ($x, $y) = @_;
+        $x *= $y;
+        return $x
+    };
+    my @stypes = ('csr', 'row_sparse');
+    my @fns = ($inplace_add, $inplace_mul);
+    for my $stype (@stypes)
+    {
+        for my $fn (@fns)
+        {
+            $check_binary->($fn, $stype);
+        }
+    }
+}
 
-    def inplace_add(x, y):
-        x += y
-        return x
-    def inplace_mul(x, y):
-        x *= y
-        return x
-    stypes = ['csr', 'row_sparse']
-    fns = [inplace_add, inplace_mul]
-    for stype in stypes:
-        for fn in fns:
-            check_binary(fn, stype)
+test_sparse_nd_binary_iop();
 
-def test_sparse_nd_negate():
-    def check_sparse_nd_negate(shape, stype):
-        npy = np.random.uniform(-10, 10, rand_shape_2d())
-        arr = mx.nd.array(npy).tostype(stype)
-        assert_almost_equal(npy, arr.asnumpy())
-        assert_almost_equal(-npy, (-arr).asnumpy())
+sub test_sparse_nd_negate
+{
+    my $check_sparse_nd_negate = sub { my ($shape, $stype) = @_;
+        my $npy = mx->nd->random->uniform(-10, 10, shape => rand_shape_2d())->aspdl;
+        my $arr = mx->nd->array($npy)->tostype($stype);
+        ok(almost_equal($npy, $arr->aspdl));
+        ok(almost_equal(-$npy, (-$arr)->aspdl));
 
         # a final check to make sure the negation (-) is not implemented
         # as inplace operation, so the contents of arr does not change after
         # we compute (-arr)
-        assert_almost_equal(npy, arr.asnumpy())
+        ok(almost_equal($npy, $arr->aspdl));
+    };
+    my $shape = rand_shape_2d();
+    my @stypes = ('csr', 'row_sparse');
+    for my $stype (@stypes)
+    {
+        $check_sparse_nd_negate->($shape, $stype);
+    }
+}
 
-    shape = rand_shape_2d()
-    stypes = ['csr', 'row_sparse']
-    for stype in stypes:
-        check_sparse_nd_negate(shape, stype)
+test_sparse_nd_negate();
 
-def test_sparse_nd_broadcast():
-    sample_num = 1000
-    # TODO(haibin) test with more than 2 dimensions
-    def test_broadcast_to(stype):
-        for i in range(sample_num):
-            ndim = 2
-            target_shape = np.random.randint(1, 11, size=ndim)
-            shape = target_shape.copy()
-            axis_flags = np.random.randint(0, 2, size=ndim)
-            axes = []
-            for (axis, flag) in enumerate(axis_flags):
-                if flag:
-                    shape[axis] = 1
-            dat = np.random.rand(*shape) - 0.5
-            numpy_ret = dat
-            ndarray = mx.nd.array(dat).tostype(stype)
-            ndarray_ret = ndarray.broadcast_to(shape=target_shape)
-            if type(ndarray_ret) is mx.ndarray.NDArray:
-                ndarray_ret = ndarray_ret.asnumpy()
-            assert (ndarray_ret.shape == target_shape).all()
-            err = np.square(ndarray_ret - numpy_ret).mean()
-            assert err < 1E-8
-    stypes = ['csr', 'row_sparse']
-    for stype in stypes:
-        test_broadcast_to(stype)
+sub test_sparse_nd_broadcast
+{
+    my $sample_num = 10; # TODO 1000
+    my $test_broadcast_to = sub { my ($stype) = @_;
+        for (1..$sample_num)
+        {
+            my $ndim = 2;
+            my $target_shape = [map { randint(1, 11) } 1..$ndim];
+            my $shape = \@{ $target_shape };
+            my $axis_flags = [map { randint(0, 2) } 1..$ndim];
+            my $axes = [];
+            enumerate(sub {
+                my ($axis, $flag) = @_;
+                if($flag)
+                {
+                    $shape->[$axis] = 1;
+                }
+            }, $axis_flags);
+            my $dat = mx->nd->random->uniform(0, 1, shape => $shape)->aspdl - 0.5;
+            my $pdl_ret = $dat;
+            my $ndarray = mx->nd->array($dat)->tostype($stype);
+            my $ndarray_ret = $ndarray->broadcast_to($target_shape);
+            ok((pdl($ndarray_ret->shape) == pdl($target_shape))->all);
+            my $err = (($ndarray_ret->aspdl - $pdl_ret)**2)->avg;
+            ok($err < 1E-8);
+        }
+    };
+    my @stypes = ('csr', 'row_sparse');
+    for my $stype (@stypes)
+    {
+        $test_broadcast_to->($stype);
+    }
+}
 
+test_sparse_nd_broadcast();
 
-def test_sparse_nd_transpose():
-    npy = np.random.uniform(-10, 10, rand_shape_2d())
-    stypes = ['csr', 'row_sparse']
-    for stype in stypes:
-        nd = mx.nd.array(npy).tostype(stype)
-        assert_almost_equal(npy.T, (nd.T).asnumpy())
+sub test_sparse_nd_transpose
+{
+    my $npy = mx->nd->random->uniform(-10, 10, shape => rand_shape_2d())->aspdl;
+    my @stypes = ('csr', 'row_sparse');
+    for my $stype (@stypes)
+    {
+        my $nd = mx->nd->array($npy)->tostype($stype);
+        ok(almost_equal($npy->transpose, ($nd->T)->aspdl));
+    }
+}
 
-def test_sparse_nd_storage_fallback():
-    def check_output_fallback(shape):
-        ones = mx.nd.ones(shape)
-        out = mx.nd.zeros(shape=shape, stype='csr')
-        mx.nd.broadcast_add(ones, ones * 2, out=out)
-        assert(np.sum(out.asnumpy() - 3) == 0)
+test_sparse_nd_transpose();
 
-    def check_input_fallback(shape):
-        ones = mx.nd.ones(shape)
-        out = mx.nd.broadcast_add(ones.tostype('csr'), ones.tostype('row_sparse'))
-        assert(np.sum(out.asnumpy() - 2) == 0)
+sub test_sparse_nd_storage_fallback
+{
+    my $check_output_fallback = sub { my ($shape) = @_;
+        my $ones = mx->nd->ones($shape);
+        my $out = mx->nd->zeros($shape, stype=>'csr');
+        mx->nd->broadcast_add($ones, $ones * 2, out=>$out);
+        ok(($out->aspdl - 3)->sum == 0);
+    };
 
-    def check_fallback_with_temp_resource(shape):
-        ones = mx.nd.ones(shape)
-        out = mx.nd.sum(ones)
-        assert(out.asscalar() == np.prod(shape))
+    my $check_input_fallback = sub { my ($shape) = @_;
+        my $ones = mx->nd->ones($shape);
+        my $out = mx->nd->broadcast_add($ones->tostype('csr'), $ones->tostype('row_sparse'));
+        ok(($out->aspdl - 2)->sum == 0);
+    };
 
-    shape = rand_shape_2d()
-    check_output_fallback(shape)
-    check_input_fallback(shape)
-    check_fallback_with_temp_resource(shape)
+    my $check_fallback_with_temp_resource = sub { my ($shape) = @_;
+        my $ones = mx->nd->ones($shape);
+        my $out = mx->nd->sum($ones);
+        ok($out->asscalar == product(@{ $shape }));
+    };
 
-def test_sparse_nd_random():
-    """ test sparse random operator on cpu """
-    # gpu random operator doesn't use fixed seed
-    if default_context().device_type is 'gpu':
-        return
-    shape = (100, 100)
-    fns = [mx.nd.random.uniform, mx.nd.random.normal, mx.nd.random.gamma]
-    for fn in fns:
-        rsp_out = mx.nd.zeros(shape=shape, stype='row_sparse')
-        dns_out = mx.nd.zeros(shape=shape, stype='default')
-        mx.random.seed(0)
-        np.random.seed(0)
-        fn(shape=shape, out=dns_out)
-        mx.random.seed(0)
-        np.random.seed(0)
-        fn(shape=shape, out=rsp_out)
-        assert_almost_equal(dns_out.asnumpy(), rsp_out.asnumpy())
+    my $shape = rand_shape_2d();
+    $check_output_fallback->($shape);
+    $check_input_fallback->($shape);
+    $check_fallback_with_temp_resource->($shape);
+}
 
+test_sparse_nd_storage_fallback();
 
-def test_sparse_nd_astype():
-    stypes = ['row_sparse', 'csr']
-    for stype in stypes:
-        x = mx.nd.zeros(shape=rand_shape_2d(), stype=stype, dtype='float32')
-        y = x.astype('int32')
-        assert(y.dtype == np.int32), y.dtype
+sub test_sparse_nd_astype
+{
+    my @stypes = ('row_sparse', 'csr');
+    for my $stype (@stypes)
+    {
+        my $x = mx->nd->zeros(rand_shape_2d(), stype => $stype, dtype => 'float32');
+        my $y = $x->astype('int32');
+        ok($y->dtype eq 'int32');
+    }
+}
 
+test_sparse_nd_astype();
+
+__END__
 
 def test_sparse_nd_pickle():
     np.random.seed(0)
