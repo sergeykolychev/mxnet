@@ -373,7 +373,7 @@ method set(AcceptableInput $other, $reverse=)
     }
     else
     {
-        my $tmp = __PACKAGE__->_array($other, ((not ref $other) ? ( pdl => $self->aspdl) : ()));
+        my $tmp = __PACKAGE__->array($other, ((not ref $other) ? ( pdl => $self->aspdl) : ()));
         $tmp->copyto($self);
     }
 }
@@ -520,6 +520,7 @@ sub ascsr
     )->xchg(0, 1);
 }
 
+
 package AI::MXNet::NDArray::RowSparse;
 use Mouse;
 extends 'AI::MXNet::NDArray::Sparse';
@@ -618,7 +619,7 @@ method set(AcceptableInput $other, $reverse=)
     }
     else
     {
-        my $tmp = __PACKAGE__->_array($other, ((not ref $other) ? ( pdl => $self->aspdl) : ()));
+        my $tmp = __PACKAGE__->array($other, ((not ref $other) ? ( pdl => $self->aspdl) : ()));
         $tmp->copyto($self);
     }
 }
@@ -760,10 +761,25 @@ method _prepare_default_dtype($src_array, $dtype)
 use Data::Dumper;
 method _check_shape($s1, $s2)
 {
-    if ($s1 and $s2 and Dumper($s1) ne Dumper($s2))
+    my ($ps1, $ps2) = map { blessed($_) ? pdl($_) : $_ } ($s1, $s2);
+    ($ps1 == $ps2)->all
+        or
+    confess("Shape mismatch detected. " . Dumper(blessed ($s1) ? $s1->undpl : $s1 ) . " v.s. " . Dumper(blessed ($s2) ? $s2 : $s2));
+}
+
+method coo_matrix(@args)
+{
+    my ($data, $row, $col, $shape) = map { blessed $_ ? $_ : pdl($_) } @args;
+    my @which;
+    my $i = 0;
+    my $j = 0;
+    for (my $i = 0; $i < $row->nelem; $i++)
     {
-        confess("Shape mismatch detected. " . Dumper($s1) . " v.s. " . Dumper($s2));
+        push @which, [$row->at($i), $col->at($i)];
     }
+    return PDL::CCS::Nd->newFromWhich(
+            pdl(\@which), $data, pdims => $shape
+    )->xchg(0, 1);
 }
 
 =head2 csr_matrix
@@ -836,7 +852,7 @@ method _check_shape($s1, $s2)
 
 method csr_matrix(
     $arg1,
-    Maybe[Shape]              :$shape=,
+    Maybe[Shape|PDL]              :$shape=,
     Maybe[AI::MXNet::Context] :$ctx=AI::MXNet::Context->current_ctx,
     Maybe[Dtype]              :$dtype='float32'
 )
@@ -851,8 +867,7 @@ method csr_matrix(
             # scipy coo matrix if input format is coo
             if(ref $arg1->[1] eq 'ARRAY' and @{ $arg1->[1] } == 2)
             {
-                my ($data, $row, $col) = map { _as_pdl($_) }($arg1->[0], @{ $arg1->[1] });
-                my $coo = __PACKAGE__->coo_matrix([$data, [$row, $col]], shape=>$shape);
+                my $coo = __PACKAGE__->coo_matrix($arg1->[0], @{ $arg1->[1] }, $shape);
                 __PACKAGE__->_check_shape($coo->shape, $shape);
                 return __PACKAGE__->array($coo, ctx => $ctx, dtype => $dtype);
             }
@@ -897,7 +912,7 @@ method csr_matrix(
             $dtype = __PACKAGE__->_prepare_default_dtype($arg1, $dtype);
             # create dns array with provided dtype. ctx is not passed since copy across
             # ctx requires dtype to be the same
-            my $dns = __PACKAGE__->_array($arg1, dtype=>$dtype);
+            my $dns = __PACKAGE__->array($arg1, dtype=>$dtype);
             if(defined $ctx and $dns->context ne $ctx)
             {
                 $dns = $dns->as_in_context($ctx);
@@ -911,7 +926,7 @@ method csr_matrix(
 # Create a AI::MXNet::NDarray::CSR based on data, indices and indptr
 method _csr_matrix_from_definition(
     $data, $indices, $indptr,
-    Maybe[Shape] :$shape=,
+    Maybe[Shape|PDL] :$shape=,
     AI::MXNet::Context :$ctx=AI::MXNet::Context->current_ctx,
     Maybe[Dtype] :$dtype=,
     Maybe[Dtype] :$indices_type=STORAGE_AUX_TYPES->{'csr'}[0],
@@ -926,15 +941,15 @@ method _csr_matrix_from_definition(
 
     if(not (blessed $data and $data->isa('AI::MXNet::NDArray')))
     {
-        $data = __PACKAGE__->_array($data, ctx => $ctx, dtype => $dtype);
+        $data = __PACKAGE__->array($data, ctx => $ctx, dtype => $dtype);
     }
     if(not (blessed $indptr and $indptr->isa('AI::MXNet::NDArray')))
     {
-        $indptr = __PACKAGE__->_array($indptr, ctx => $ctx, dtype => $indptr_type);
+        $indptr = __PACKAGE__->array($indptr, ctx => $ctx, dtype => $indptr_type);
     }
     if(not (blessed $indices and $indices->isa('AI::MXNet::NDArray')))
     {
-        $indices = __PACKAGE__->_array($indices, ctx => $ctx, dtype => $indices_type);
+        $indices = __PACKAGE__->array($indices, ctx => $ctx, dtype => $indices_type);
     }
     if(not defined $shape)
     {
@@ -943,6 +958,10 @@ method _csr_matrix_from_definition(
             confess('invalid shape');
         }
         $shape = [@{ $indptr } - 1, $indices->max->asscalar + 1];
+    }
+    elsif(blessed $shape)
+    {
+        $shape = $shape->unpdl;
     }
     # verify shapes
     my $aux_shapes = [$indptr->shape, $indices->shape];
@@ -1067,7 +1086,7 @@ method row_sparse_array(
             $dtype = __PACKAGE__->_prepare_default_dtype($arg1, $dtype);
             # create dns array with provided dtype. ctx is not passed since copy across
             # ctx requires dtype to be the same
-            my $dns = __PACKAGE__->_array($arg1, dtype => $dtype);
+            my $dns = __PACKAGE__->array($arg1, dtype => $dtype);
             if(defined $ctx and $dns->context ne $ctx)
             {
                 $dns = $dns->as_in_context($ctx);
@@ -1094,11 +1113,11 @@ method _row_sparse_ndarray_from_definition(
 
     if(not (blessed $data and $data->isa('AI::MXNet::NDArray')))
     {
-        $data = __PACKAGE__->_array($data, ctx => $ctx, dtype => $dtype);
+        $data = __PACKAGE__->array($data, ctx => $ctx, dtype => $dtype);
     }
     if(not (blessed $indices and $indices->isa('AI::MXNet::NDArray')))
     {
-        $indices = __PACKAGE__->_array($indices, ctx => $ctx, dtype => $indices_type);
+        $indices = __PACKAGE__->array($indices, ctx => $ctx, dtype => $indices_type);
     }
     if(not defined $shape)
     {
@@ -1253,7 +1272,7 @@ method empty(
     <AI::MXNet::NDArray::RowSparse 3x2 @cpu(0)>
 =cut
 
-method _array(
+method array(
     AcceptableInput $source_array,
     Maybe[AI::MXNet::Context] :$ctx=AI::MXNet::Context->current_ctx,
     Maybe[Dtype] :$dtype='float32',
@@ -1267,7 +1286,7 @@ method _array(
             $pdl .= $source_array;
             $source_array = $pdl;
         }
-        return __PACKAGE__->array($source_array, ctx => $ctx, dtype => $dtype);
+        return __PACKAGE__->SUPER::array($source_array, ctx => $ctx, dtype => $dtype);
     }
     if($source_array->isa('AI::MXNet::NDArray'))
     {

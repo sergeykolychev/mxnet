@@ -528,74 +528,85 @@ sub test_sparse_nd_astype
 
 test_sparse_nd_astype();
 
+sub test_sparse_nd_storable
+{
+    my $repeat = 1;
+    my $dim0 = 40;
+    my $dim1 = 40;
+    my @stypes = ('row_sparse', 'csr');
+    my @densities = (0, 0.5);
+    my %stype = (row_sparse => 'AI::MXNet::NDArray::RowSparse', csr => 'AI::MXNet::NDArray::CSR');
+    for (1..$repeat)
+    {
+        my $shape = rand_shape_2d($dim0, $dim1);
+        for my $stype (@stypes)
+        {
+            for my $density (@densities)
+            {
+                my ($a) = rand_sparse_ndarray($shape, $stype, density => $density);
+                ok($a->isa($stype{$stype}));
+                my $data = Storable::freeze($a);
+                my $b = Storable::thaw($data);
+                ok($b->isa($stype{$stype}));
+                ok(same($a->aspdl, $b->aspdl));
+            }
+        }
+    }
+}
+
+test_sparse_nd_storable();
+
+sub test_sparse_nd_save_load
+{
+    my $repeat = 1;
+    my @stypes = ('default', 'row_sparse', 'csr');
+    my %stype = (default => 'AI::MXNet::NDArray', row_sparse => 'AI::MXNet::NDArray::RowSparse', csr => 'AI::MXNet::NDArray::CSR');
+    my $num_data = 20;
+    my @densities = (0, 0.5);
+    my $fname = 'tmp_list.bin';
+    for (1..$repeat)
+    {
+        my @data_list1;
+        for (1..$num_data)
+        {
+            my $stype = $stypes[randint(0, scalar(@stypes))];
+            my $shape = rand_shape_2d(40, 40);
+            my $density = $densities[randint(0, scalar(@densities))];
+            push @data_list1, rand_ndarray($shape, $stype, $density);
+            ok($data_list1[-1]->isa($stype{$stype}));
+        }
+        mx->nd->save($fname, \@data_list1);
+
+        my @data_list2 = @{ mx->nd->load($fname) };
+        ok(@data_list1 == @data_list2);
+        zip(sub {
+            my ($x, $y) = @_;
+            ok(same($x->aspdl, $y->aspdl));
+        }, \@data_list1, \@data_list2);
+
+        my %data_map1;
+        enumerate(sub {
+            my ($i, $x) = @_;
+            $data_map1{"ndarray xx $i"} = $x;
+        }, \@data_list1);
+        mx->nd->save($fname, \%data_map1);
+        my %data_map2 = %{ mx->nd->load($fname) };
+        ok(keys(%data_map1) == keys(%data_map2));
+        while(my ($k, $x) = each %data_map1)
+        {
+            my $y = $data_map2{$k};
+            ok(same($x->aspdl, $y->aspdl));
+        }
+    }
+    unlink $fname;
+}
+
+test_sparse_nd_save_load();
+
 __END__
 
-def test_sparse_nd_pickle():
-    np.random.seed(0)
-    repeat = 1
-    dim0 = 40
-    dim1 = 40
-    stypes = ['row_sparse', 'csr']
-    densities = [0, 0.5]
-    stype_dict = {'row_sparse': RowSparseNDArray, 'csr': CSRNDArray}
-    for _ in range(repeat):
-        shape = rand_shape_2d(dim0, dim1)
-        for stype in stypes:
-            for density in densities:
-                a, _ = rand_sparse_ndarray(shape, stype, density)
-                assert isinstance(a, stype_dict[stype])
-                data = pkl.dumps(a)
-                b = pkl.loads(data)
-                assert isinstance(b, stype_dict[stype])
-                assert same(a.asnumpy(), b.asnumpy())
-
-
-def test_sparse_nd_save_load():
-    np.random.seed(0)
-    repeat = 1
-    stypes = ['default', 'row_sparse', 'csr']
-    stype_dict = {'default': NDArray, 'row_sparse': RowSparseNDArray, 'csr': CSRNDArray}
-    num_data = 20
-    densities = [0, 0.5]
-    fname = 'tmp_list.bin'
-    for _ in range(repeat):
-        data_list1 = []
-        for i in range(num_data):
-            stype = stypes[np.random.randint(0, len(stypes))]
-            shape = rand_shape_2d(dim0=40, dim1=40)
-            density = densities[np.random.randint(0, len(densities))]
-            data_list1.append(rand_ndarray(shape, stype, density))
-            assert isinstance(data_list1[-1], stype_dict[stype])
-        mx.nd.save(fname, data_list1)
-
-        data_list2 = mx.nd.load(fname)
-        assert len(data_list1) == len(data_list2)
-        for x, y in zip(data_list1, data_list2):
-            assert same(x.asnumpy(), y.asnumpy())
-
-        data_map1 = {'ndarray xx %s' % i: x for i, x in enumerate(data_list1)}
-        mx.nd.save(fname, data_map1)
-        data_map2 = mx.nd.load(fname)
-        assert len(data_map1) == len(data_map2)
-        for k, x in data_map1.items():
-            y = data_map2[k]
-            assert same(x.asnumpy(), y.asnumpy())
-    os.remove(fname)
-
-def test_sparse_nd_unsupported():
-    nd = mx.nd.zeros((2,2), stype='row_sparse')
-    fn_slice = lambda x: x._slice(None, None)
-    fn_at = lambda x: x._at(None)
-    fn_reshape = lambda x: x.reshape(None)
-    fns = [fn_slice, fn_at, fn_reshape]
-    for fn in fns:
-        try:
-            fn(nd)
-            assert(False)
-        except:
-            pass
-
-def test_create_csr():
+sub test_create_csr
+{
     def check_create_csr_from_nd(shape, density, dtype):
         matrix = rand_ndarray(shape, 'csr', density)
         # create data array with provided dtype and ctx

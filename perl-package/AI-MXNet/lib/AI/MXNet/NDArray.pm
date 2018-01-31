@@ -342,7 +342,7 @@ method _slice (
             $stop
         )
     );
-    return __PACKAGE__->new(handle => $handle, writable => $self->writable);
+    return __PACKAGE__->_ndarray_cls($handle, $self->writable);
 }
 
 =head2  _at
@@ -363,7 +363,7 @@ method _at(Index $idx)
                     $self->handle, $idx >=0 ? $idx : $self->shape->[0] + $idx
                 )
     );
-    return __PACKAGE__->new(handle => $handle, writable => $self->writable);
+    return __PACKAGE__->_ndarray_cls($handle, $self->writable);
 }
 
 =head2 reshape
@@ -401,7 +401,7 @@ method reshape(ArrayRef[Int] $new_shape)
                         $new_shape
                     )
     );
-    return __PACKAGE__->new(handle => $handle, writable => $self->writable);
+    return __PACKAGE__->_ndarray_cls($handle, $self->writable);
 }
 
 =head2 ndim
@@ -1279,7 +1279,7 @@ method load(Str $filename)
     my ($handles, $names) = check_call(AI::MXNetCAPI::NDArrayLoad($filename));
     if (not @$names)
     {
-        return [map { __PACKAGE__->new(handle => $_) } @$handles];
+        return [map { __PACKAGE__->_ndarray_cls($_) } @$handles];
     }
     else
     {
@@ -1287,7 +1287,7 @@ method load(Str $filename)
         my $h = @$handles;
         confess("Handles [$h] and names [$n] count mismatch") unless $h == $n;
         my %ret;
-        @ret{ @$names } = map { __PACKAGE__->new(handle => $_) } @$handles;
+        @ret{ @$names } = map { __PACKAGE__->_ndarray_cls($_) } @$handles;
         return \%ret;
     }
 }
@@ -1494,7 +1494,7 @@ method _fresh_grad(Maybe[Bool] $state=)
 method detach()
 {
     my $handle = check_call(AI::MXNetCAPI::NDArrayDetach($self->handle));
-    return __PACKAGE__->new(handle => $handle);
+    return __PACKAGE__->_ndarray_cls($handle);
 }
 
 =head2 attach_grad
@@ -1544,7 +1544,7 @@ method grad()
 {
     my $handle = check_call(AI::MXNetCAPI::NDArrayGetGrad($self->handle));
     return undef unless defined $handle;
-    return __PACKAGE__->new(handle => $handle);
+    return __PACKAGE__->_ndarray_cls($handle);
 }
 
 =head2 backward

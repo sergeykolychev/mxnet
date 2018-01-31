@@ -25,6 +25,7 @@ use base qw(Exporter);
 
 class_type 'PDL';
 class_type 'PDL::Matrix';
+class_type 'PDL::CCS::Nd';
 class_type 'AI::MXNet::NDArray';
 class_type 'AI::MXNet::Symbol';
 class_type 'AI::MXNet::NDArray::Slice';
@@ -47,7 +48,7 @@ class_type 'AI::MXNet::Symbol::NameManager';
 class_type 'AI::MXNet::NDarray::CSR';
 class_type 'AI::MXNet::NDArray::RowSparse';
 class_type 'PDL::CCS::Nd';
-subtype "AcceptableInput" => as "Num|PDL|PDL::Matrix|AI::MXNet::NDArray|AI::MXNet::NDArray::Slice|ArrayRef|AI::MXNet::NDarray::CSR|AI::MXNet::NDArray::RowSparse";
+subtype "AcceptableInput" => as "Num|PDL|PDL::Matrix|PDL::CCS::Nd|AI::MXNet::NDArray|AI::MXNet::NDArray::Slice|ArrayRef|AI::MXNet::NDarray::CSR|AI::MXNet::NDArray::RowSparse";
 subtype "Index"           => as "Int";
 subtype "DimSize"         => as "Int" => where { $_ >= 0 };
 subtype "Dropout"         => as "Num" => where { $_ >= 0 and $_ <= 1 };
