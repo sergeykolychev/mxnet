@@ -25,6 +25,7 @@ use AI::MXNetCAPI 1.1;
 use AI::NNVMCAPI 1.1;
 use AI::MXNet::Types;
 use Time::HiRes;
+use Scalar::Util qw(blessed);
 use Carp;
 use Exporter;
 use base qw(Exporter);
@@ -400,6 +401,23 @@ sub ascsr
     )->xchg(0, 1);
 }
 
+package AI::MXNet::COO::Nd;
+use Mouse;
+has ['data', 'row', 'col'] => (is => 'rw');
+no Mouse;
+
+package AI::MXNet::Base;
+
+sub tocoo
+{
+    my $csr = shift;
+    return AI::MXNet::COO::Nd->new(
+        data => $csr->data,
+        row  => $csr->_whichND->slice(0)->flat,
+        col  => $csr->_whichND->slice(1)->flat
+    );
+}
+
 sub rand_sparse
 {
     my ($num_rows, $num_cols, $density, $dtype, $format) = @_;
@@ -421,8 +439,10 @@ sub rand_sparse
     *PDL::CCS::Nd::data    = sub { shift->_nzvals };
     *PDL::CCS::Nd::indptr  = sub { my $self = shift; ($self->hasptr ? $self->getptr : $self->ptr)[0] };
     *PDL::CCS::Nd::indices = sub { shift->_whichND->slice(1)->flat };
-    *PDL::tocsr            = sub { shift->xchg(0, 1)->toccs->xchg(0, 1) };
+    *PDL::CCS::Nd::tocoo   = sub { tocoo(shift) };
     *PDL::CCS::Nd::shape   = sub { shift->pdims };
+    *PDL::CCS::Nd::dtype   = sub { DTYPE_MX_TO_STR->{ DTYPE_PDL_TO_MX->{ shift->type->numval } } };
+    *PDL::tocsr            = sub { shift->xchg(0, 1)->toccs->xchg(0, 1) };
     *PDL::rand_sparse      = sub { shift; rand_sparse(@_) };
 }
 

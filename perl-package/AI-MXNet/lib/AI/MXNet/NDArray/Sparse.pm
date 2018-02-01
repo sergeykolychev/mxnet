@@ -231,6 +231,7 @@ method _aux_data(Int $i)
 }
 
 package AI::MXNet::NDArray::CSR;
+use AI::MXNet::Base;
 use Mouse;
 extends 'AI::MXNet::NDArray::Sparse';
 
@@ -495,31 +496,8 @@ method copyto(AI::MXNet::Context|AI::MXNet::NDArray $other)
 
 method aspdlccs()
 {
-    my $data    = $self->data->aspdl;
-    my $indices = $self->indices->aspdl;
-    my $indptr  = $self->indptr->aspdl;
     return ascsr($self->data->aspdl, $self->indptr->aspdl, $self->indices->aspdl, $self->shape);
 }
-
-sub ascsr
-{
-    my ($data, $indptr, $indices, $shape) = @_;
-    my @which;
-    my $i = 0;
-    my $j = 0;
-    while($i < $indices->nelem)
-    {
-        for($i = $indptr->at($j); $i < $indptr->at($j+1); $i++)
-        {
-            push @which, [$j, $indices->at($i)];
-        }
-        $j++;
-    }
-    return PDL::CCS::Nd->newFromWhich(
-            pdl(\@which), $data, pdims => blessed $shape ? $shape : pdl($shape)
-    )->xchg(0, 1);
-}
-
 
 package AI::MXNet::NDArray::RowSparse;
 use Mouse;
@@ -854,7 +832,7 @@ method csr_matrix(
     $arg1,
     Maybe[Shape|PDL]              :$shape=,
     Maybe[AI::MXNet::Context] :$ctx=AI::MXNet::Context->current_ctx,
-    Maybe[Dtype]              :$dtype='float32'
+    Maybe[Dtype]              :$dtype=
 )
 {
     # construct a csr matrix from (M, N) or (data, indices, indptr)

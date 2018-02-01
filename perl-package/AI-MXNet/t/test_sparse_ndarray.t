@@ -603,43 +603,44 @@ sub test_sparse_nd_save_load
 
 test_sparse_nd_save_load();
 
-__END__
-
 sub test_create_csr
 {
-    def check_create_csr_from_nd(shape, density, dtype):
-        matrix = rand_ndarray(shape, 'csr', density)
+    my $check_create_csr_from_nd = sub { my ($shape, $density, $dtype) = @_;
+        my $matrix = rand_ndarray($shape, 'csr', $density);
         # create data array with provided dtype and ctx
-        data = mx.nd.array(matrix.data.asnumpy(), dtype=dtype)
-        indptr = matrix.indptr
-        indices = matrix.indices
-        csr_created = mx.nd.sparse.csr_matrix((data, indices, indptr), shape=shape)
-        assert csr_created.stype == 'csr'
-        assert same(csr_created.data.asnumpy(), data.asnumpy())
-        assert same(csr_created.indptr.asnumpy(), indptr.asnumpy())
-        assert same(csr_created.indices.asnumpy(), indices.asnumpy())
+        my $data = mx->nd->array($matrix->data->aspdl, dtype=>$dtype);
+        my $indptr = $matrix->indptr;
+        my $indices = $matrix->indices;
+        my $csr_created = mx->nd->sparse->csr_matrix([$data, $indices, $indptr], shape=>$shape);
+        ok($csr_created->stype eq 'csr');
+        ok(same($csr_created->data->aspdl, $data->aspdl));
+        ok(same($csr_created->indptr->aspdl, $indptr->aspdl));
+        ok(same($csr_created->indices->aspdl, $indices->aspdl));
         # verify csr matrix dtype and ctx is consistent from the ones provided
-        assert csr_created.dtype == dtype, (csr_created, dtype)
-        assert csr_created.data.dtype == dtype, (csr_created.data.dtype, dtype)
-        assert csr_created.context == Context.default_ctx, (csr_created.context, Context.default_ctx)
-        csr_copy = mx.nd.array(csr_created)
-        assert(same(csr_copy.asnumpy(), csr_created.asnumpy()))
+        ok($csr_created->dtype eq $dtype);
+        ok($csr_created->data->dtype eq $dtype);
+        ok($csr_created->context eq AI::MXNet::Context->current_ctx);
+        my $csr_copy = mx->nd->array($csr_created);
+        ok(same($csr_copy->aspdl, $csr_created->aspdl));
+    };
 
-    def check_create_csr_from_coo(shape, density, dtype):
-        matrix = rand_ndarray(shape, 'csr', density)
-        sp_csr = matrix.asscipy()
-        sp_coo = sp_csr.tocoo()
-        csr_created = mx.nd.sparse.csr_matrix((sp_coo.data, (sp_coo.row, sp_coo.col)), shape=shape, dtype=dtype)
-        assert csr_created.stype == 'csr'
-        assert same(csr_created.data.asnumpy(), sp_csr.data)
-        assert same(csr_created.indptr.asnumpy(), sp_csr.indptr)
-        assert same(csr_created.indices.asnumpy(), sp_csr.indices)
-        csr_copy = mx.nd.array(csr_created)
-        assert(same(csr_copy.asnumpy(), csr_created.asnumpy()))
+    my $check_create_csr_from_coo = sub { my ($shape, $density, $dtype) = @_;
+        my $matrix = rand_ndarray($shape, 'csr', $density);
+        my $sp_csr = $matrix->aspdlccs;
+        my $sp_coo = $sp_csr->tocoo();
+        my $csr_created = mx->nd->sparse->csr_matrix([$sp_coo->data, [$sp_coo->row, $sp_coo->col]], shape=>$shape, dtype=>$dtype);
+        ok($csr_created->stype eq 'csr');
+        ok(same($csr_created->data->aspdl, $sp_csr->data));
+        ok(same($csr_created->indptr->aspdl, $sp_csr->indptr));
+        ok(same($csr_created->indices->aspdl, $sp_csr->indices));
+        my $csr_copy = mx->nd->array($csr_created);
+        ok(same($csr_copy->aspdl, $csr_created->aspdl));
         # verify csr matrix dtype and ctx is consistent
-        assert csr_created.dtype == dtype, (csr_created.dtype, dtype)
-        assert csr_created.data.dtype == dtype, (csr_created.data.dtype, dtype)
-        assert csr_created.context == Context.default_ctx, (csr_created.context, Context.default_ctx)
+        ok($csr_created->dtype eq $dtype);
+        ok($csr_created->data->dtype eq $dtype);
+        ok($csr_created->context eq AI::MXNet::Context->current_ctx);
+    };
+=head
 
     def check_create_csr_from_scipy(shape, density, f):
         def assert_csr_almost_equal(nd, sp):
@@ -670,17 +671,25 @@ sub test_create_csr
             assert_csr_almost_equal(canonical_csr_nd, canonical_csr_sp)
         except ImportError:
             print("Could not import scipy.sparse. Skipping unit tests for scipy csr creation")
+=cut
 
-    dim0 = 20
-    dim1 = 20
-    densities = [0, 0.5]
-    dtype = np.float64
-    for density in densities:
-        shape = rand_shape_2d(dim0, dim1)
-        check_create_csr_from_nd(shape, density, dtype)
-        check_create_csr_from_coo(shape, density, dtype)
-        check_create_csr_from_scipy(shape, density, mx.nd.sparse.array)
-        check_create_csr_from_scipy(shape, density, mx.nd.array)
+    my $dim0 = 20;
+    my $dim1 = 20;
+    my @densities = (0.5);
+    my $dtype = 'float64';
+    for my $density (@densities)
+    {
+        my $shape = [$dim0, $dim1];
+        $check_create_csr_from_nd->($shape, $density, $dtype);
+        $check_create_csr_from_coo->($shape, $density, $dtype);
+        #check_create_csr_from_scipy(shape, density, mx.nd.sparse.array)
+        #check_create_csr_from_scipy(shape, density, mx.nd.array)
+    }
+}
+
+test_create_csr();
+
+__END__
 
 def test_create_row_sparse():
     dim0 = 50

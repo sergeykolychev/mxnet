@@ -1116,6 +1116,7 @@ method array(PDL|PDL::Matrix|ArrayRef|AI::MXNet::NDArray $source_array, AI::MXNe
 {
     if(blessed $source_array and $source_array->isa('AI::MXNet::NDArray'))
     {
+        return AI::MXNet::NDArray::Sparse->array($source_array, ctx => $ctx, dtype => $dtype) unless $source_array->stype eq 'default';
         my $arr = __PACKAGE__->empty($source_array->shape, ctx => $ctx, dtype => $dtype);
         $arr .= $source_array;
         return $arr;
