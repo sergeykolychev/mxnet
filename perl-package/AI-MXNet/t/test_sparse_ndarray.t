@@ -23,7 +23,7 @@ use Test::More 'no_plan';
 use AI::MXNet qw(mx);
 use AI::MXNet::TestUtils qw(zip assert enumerate same rand_shape_2d rand_shape_3d
     rand_sparse_ndarray random_arrays almost_equal rand_ndarray randint allclose);
-use AI::MXNet::Base qw(pones pzeros pdl product);
+use AI::MXNet::Base qw(pones pzeros pdl product rand_sparse);
 $ENV{MXNET_STORAGE_FALLBACK_LOG_VERBOSE} = 0;
 use Data::Dumper;
 sub sparse_nd_ones
@@ -640,38 +640,31 @@ sub test_create_csr
         ok($csr_created->data->dtype eq $dtype);
         ok($csr_created->context eq AI::MXNet::Context->current_ctx);
     };
-=head
 
-    def check_create_csr_from_scipy(shape, density, f):
-        def assert_csr_almost_equal(nd, sp):
-            assert_almost_equal(nd.data.asnumpy(), sp.data)
-            assert_almost_equal(nd.indptr.asnumpy(), sp.indptr)
-            assert_almost_equal(nd.indices.asnumpy(), sp.indices)
-            sp_csr = nd.asscipy()
-            assert_almost_equal(sp_csr.data, sp.data)
-            assert_almost_equal(sp_csr.indptr, sp.indptr)
-            assert_almost_equal(sp_csr.indices, sp.indices)
-            assert(sp.dtype == sp_csr.dtype), (sp.dtype, sp_csr.dtype)
+    my $check_create_csr_from_pdlccs = sub { my ($shape, $density, $f) = @_;
+        my $assert_csr_almost_equal = sub { my ($nd, $sp) = @_;
+            ok(almost_equal($nd->data->aspdl, $sp->data));
+            ok(almost_equal($nd->indptr->aspdl, $sp->indptr));
+            ok(almost_equal($nd->indices->aspdl, $sp->indices));
+            my $sp_csr = $nd->aspdlccs;
+            ok(almost_equal($sp_csr->data, $sp->data));
+            ok(almost_equal($sp_csr->indptr, $sp->indptr));
+            ok(almost_equal($sp_csr->indices, $sp->indices));
+            ok($sp->dtype eq $sp_csr->dtype);
+        };
 
-        try:
-            import scipy.sparse as spsp
-            # random canonical csr
-            csr_sp = spsp.rand(shape[0], shape[1], density, format="csr")
-            csr_nd = f(csr_sp)
-            assert_csr_almost_equal(csr_nd, csr_sp)
+            my $csr_sp = rand_sparse($shape->[0], $shape->[1], $density);
+            my $csr_nd = $f->($csr_sp);
+            ok(almost_equal($csr_nd->aspdl, $csr_sp->todense));
             # non-canonical csr which contains duplicates and unsorted indices
-            indptr = np.array([0, 2, 3, 7])
-            indices = np.array([0, 2, 2, 0, 1, 2, 1])
-            data = np.array([1, 2, 3, 4, 5, 6, 1])
-            non_canonical_csr = spsp.csr_matrix((data, indices, indptr), shape=(3, 3), dtype=csr_nd.dtype)
-            canonical_csr_nd = f(non_canonical_csr, dtype=csr_nd.dtype)
-            canonical_csr_sp = non_canonical_csr.copy()
-            canonical_csr_sp.sum_duplicates()
-            canonical_csr_sp.sort_indices()
-            assert_csr_almost_equal(canonical_csr_nd, canonical_csr_sp)
-        except ImportError:
-            print("Could not import scipy.sparse. Skipping unit tests for scipy csr creation")
-=cut
+            my $indptr = pdl([0, 2, 3, 7]);
+            my $indices = pdl([0, 2, 2, 0, 1, 2, 1]);
+            my $data = pdl([1, 2, 3, 4, 5, 6, 1]);
+            my $non_canonical_csr = mx->nd->sparse->csr_matrix([$data, $indices, $indptr], shape=>[3, 3], dtype=>$csr_nd->dtype);
+            my $canonical_csr_nd = $f->($non_canonical_csr, dtype=>$csr_nd->dtype);
+            my $canonical_csr_sp = $non_canonical_csr->copy();
+            ok(almost_equal($canonical_csr_nd->aspdl, $canonical_csr_sp->aspdl));
+    };
 
     my $dim0 = 20;
     my $dim1 = 20;
@@ -682,30 +675,36 @@ sub test_create_csr
         my $shape = [$dim0, $dim1];
         $check_create_csr_from_nd->($shape, $density, $dtype);
         $check_create_csr_from_coo->($shape, $density, $dtype);
-        #check_create_csr_from_scipy(shape, density, mx.nd.sparse.array)
-        #check_create_csr_from_scipy(shape, density, mx.nd.array)
+        $check_create_csr_from_pdlccs->($shape, $density, sub { mx->nd->sparse->array(@_) });
+        $check_create_csr_from_pdlccs->($shape, $density, sub { mx->nd->array(@_) });
     }
 }
 
 test_create_csr();
 
-__END__
+sub test_create_row_sparse
+{
+    my $dim0 = 50;
+    my $dim1 = 50;
+    my @densities = (0, 0.5, 1);
+    for my $density (@densities)
+    {
+        my $shape = rand_shape_2d($dim0, $dim1);
+        my $matrix = rand_ndarray($shape, 'row_sparse', $density);
+        my $data = $matrix->data;
+        my $indices = $matrix->indices;
+        my $rsp_created = mx->nd->sparse->row_sparse_array([$data, $indices], shape=>$shape);
+        ok($rsp_created->stype eq 'row_sparse');
+        ok(same($rsp_created->data->aspdl, $data->aspdl));
+        ok(same($rsp_created->indices->aspdl, $indices->aspdl));
+        my $rsp_copy = mx->nd->array($rsp_created);
+        ok(same($rsp_copy->aspdl, $rsp_created->aspdl));
+    }
+}
 
-def test_create_row_sparse():
-    dim0 = 50
-    dim1 = 50
-    densities = [0, 0.5, 1]
-    for density in densities:
-        shape = rand_shape_2d(dim0, dim1)
-        matrix = rand_ndarray(shape, 'row_sparse', density)
-        data = matrix.data
-        indices = matrix.indices
-        rsp_created = mx.nd.sparse.row_sparse_array((data, indices), shape=shape)
-        assert rsp_created.stype == 'row_sparse'
-        assert same(rsp_created.data.asnumpy(), data.asnumpy())
-        assert same(rsp_created.indices.asnumpy(), indices.asnumpy())
-        rsp_copy = mx.nd.array(rsp_created)
-        assert(same(rsp_copy.asnumpy(), rsp_created.asnumpy()))
+test_create_row_sparse();
+
+__END__
 
 def test_create_sparse_nd_infer_shape():
     def check_create_csr_infer_shape(shape, density, dtype):

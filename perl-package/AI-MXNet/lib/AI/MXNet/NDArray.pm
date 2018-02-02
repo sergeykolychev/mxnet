@@ -1112,7 +1112,7 @@ method full(
         The created NDArray.
 =cut
 
-method array(PDL|PDL::Matrix|ArrayRef|AI::MXNet::NDArray $source_array, AI::MXNet::Context :$ctx=AI::MXNet::Context->current_ctx, Dtype :$dtype='float32')
+method array(PDL|PDL::Matrix|PDL::CCS::Nd|ArrayRef|AI::MXNet::NDArray $source_array, AI::MXNet::Context :$ctx=AI::MXNet::Context->current_ctx, Dtype :$dtype='float32')
 {
     if(blessed $source_array and $source_array->isa('AI::MXNet::NDArray'))
     {
@@ -1120,6 +1120,10 @@ method array(PDL|PDL::Matrix|ArrayRef|AI::MXNet::NDArray $source_array, AI::MXNe
         my $arr = __PACKAGE__->empty($source_array->shape, ctx => $ctx, dtype => $dtype);
         $arr .= $source_array;
         return $arr;
+    }
+    elsif(blessed $source_array and $source_array->isa('PDL::CCS::Nd'))
+    {
+        return AI::MXNet::NDArray::Sparse->array($source_array, ctx => $ctx, dtype => $dtype);
     }
     my $pdl_type = PDL::Type->new(DTYPE_MX_TO_PDL->{ $dtype });
     if(not blessed($source_array))

@@ -604,6 +604,22 @@ method set(AcceptableInput $other, $reverse=)
 
 use overload '.=' => \&set;
 
+=head2 data
+
+        A deep copy NDArray of the data array of the AI::MXNet::NDArray::RowSparse.
+        This generates a deep copy of the data of the current `row_sparse` matrix.
+
+        Returns
+        -------
+        NDArray
+            This AI::MXNet::NDArray::RowSparse data array.
+=cut
+
+method data()
+{
+    return $self->_data;
+}
+
 =head2 indices
 
         A deep copy NDArray of the indices array of the AI::MXNet::NDArray::RowSparse.
