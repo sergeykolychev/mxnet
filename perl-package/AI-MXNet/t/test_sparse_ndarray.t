@@ -866,39 +866,42 @@ sub test_create_sparse_nd_empty
 
 test_create_sparse_nd_empty();
 
-__END__
-
-def test_synthetic_dataset_generator():
-    def test_powerlaw_generator(csr_arr, final_row=1):
-        """Test power law distribution
-        Total Elements: 32000, Number of zeros: 3200
-        Every row has 2 * non zero elements of the previous row.
-        Also since (2047 < 3200 < 4095) this will be true till 10th row"""
-        indices = csr_arr.indices.asnumpy()
-        indptr = csr_arr.indptr.asnumpy()
-        for row in range(1, final_row + 1):
-            nextrow = row + 1
-            current_row_nnz = indices[indptr[row] - 1] + 1
-            next_row_nnz = indices[indptr[nextrow] - 1] + 1
-            assert next_row_nnz == 2 * current_row_nnz
+sub test_synthetic_dataset_generator
+{
+    my $test_powerlaw_generator = sub { my ($csr_arr, $final_row) = @_;
+        my $indices = $csr_arr->indices->aspdl;
+        my $indptr = $csr_arr->indptr->aspdl;
+        for my $row (1..$final_row)
+        {
+            my $nextrow = $row + 1;
+            my $current_row_nnz = $indices->at($indptr->at($row) - 1) + 1;
+            my $next_row_nnz = $indices->at($indptr->at($nextrow) - 1) + 1;
+            ok($next_row_nnz == 2 * $current_row_nnz);
+        }
+    };
 
     # Test if density is preserved
-    csr_arr_cols, _ = rand_sparse_ndarray(shape=(32, 10000), stype="csr",
-                                          density=0.01, distribution="powerlaw")
+    my ($csr_arr_cols) = rand_sparse_ndarray([32, 10000], "csr",
+                                          density=>0.01, distribution=>"powerlaw");
 
-    csr_arr_small, _ = rand_sparse_ndarray(shape=(5, 5), stype="csr",
-                                           density=0.5, distribution="powerlaw")
+    my ($csr_arr_small) = rand_sparse_ndarray([5, 5], "csr",
+                                           density=>0.5, distribution=>"powerlaw");
 
-    csr_arr_big, _ = rand_sparse_ndarray(shape=(32, 1000000), stype="csr",
-                                         density=0.4, distribution="powerlaw")
+    my ($csr_arr_big) = rand_sparse_ndarray([32, 1000000], "csr",
+                                         density=>0.4, distribution=>"powerlaw");
 
-    csr_arr_square, _ = rand_sparse_ndarray(shape=(1600, 1600), stype="csr",
-                                            density=0.5, distribution="powerlaw")
-    assert len(csr_arr_cols.data) == 3200
-    test_powerlaw_generator(csr_arr_cols, final_row=9)
-    test_powerlaw_generator(csr_arr_small, final_row=1)
-    test_powerlaw_generator(csr_arr_big, final_row=4)
-    test_powerlaw_generator(csr_arr_square, final_row=6)
+    my ($csr_arr_square) = rand_sparse_ndarray([1600, 1600], "csr",
+                                            density=>0.5, distribution=>"powerlaw");
+    ok($csr_arr_cols->data->len == 3200);
+    $test_powerlaw_generator->($csr_arr_cols, 9);
+    $test_powerlaw_generator->($csr_arr_small, 1);
+    $test_powerlaw_generator->($csr_arr_big, 4);
+    $test_powerlaw_generator->($csr_arr_square, 6);
+}
+
+test_synthetic_dataset_generator();
+
+__END__
 
 def test_sparse_nd_fluent():
     def check_fluent_regular(stype, func, kwargs, shape=(5, 17), equal_nan=False):

@@ -513,18 +513,17 @@ func _get_powerlaw_dataset_csr($num_rows, $num_cols, $density=0.1, $dtype='float
     my $total_nnz = int($num_rows * $num_cols * $density);
 
     my $unused_nnz = $total_nnz;
-    my $output_arr = mx->nd->zeros([$num_rows, $num_cols], dtype=>$dtype);
+    my $output_arr = zeros($num_cols, $num_rows);
     # Start with ones on each row so that no row is empty
     for my $row (0..$num_rows-1)
     {
-        $output_arr->at($row)->at(0) .= 1 + rand(2);
+        $output_arr->slice(0, $row) .= 1 + rand(2);
         $unused_nnz--;
         if($unused_nnz <= 0)
         {
-            return $output_arr->tostype("csr");
+            return mx->nd->array($output_arr)->tostype("csr");
         }
     }
-
     # Populate rest of matrix with 2^i items in ith row.
     # if we have used all total nnz return the sparse matrix
     # else if we reached max column size then fill up full columns until we use all nnz
@@ -535,31 +534,31 @@ func _get_powerlaw_dataset_csr($num_rows, $num_cols, $density=0.1, $dtype='float
         # In case col_limit reached assign same value to all elements, which is much faster
         if($col_limit == $num_cols and $unused_nnz > $col_limit)
         {
-            $output_arr->at($row) .= 1 + rand(2);
-            $unused_nnz--;
+            $output_arr->slice('X', $row) .= 1 + rand(2);
+            $unused_nnz = $unused_nnz - $col_limit + 1;
             if($unused_nnz <= 0)
             {
-                return $output_arr->tostype("csr");
-            }
-            else
-            {
-                next;
+                return mx->nd->array($output_arr)->tostype("csr");
             }
         }
-        for my $col_index (1..$col_limit-1)
+        else
         {
-            $output_arr->at($row)->at($col_index) = 1 + rand(2);
-            $unused_nnz--;
-            if($unused_nnz <= 0)
+            for my $col_index (1..$col_limit-1)
             {
-                return $output_arr->tostype("csr");
+                $output_arr->slice($col_index, $row) .= 1 + rand(2);
+                $unused_nnz--;
+                if($unused_nnz <= 0)
+                {
+                    return mx->nd->array($output_arr)->tostype("csr");
+                }
             }
+            $col_max *= 2;
         }
-        $col_max = $col_max * 2;
     }
 
     if($unused_nnz > 0)
     {
+        warn $unused_nnz;
         confess(
             "not supported for this density: $density"
             ." for this shape ($num_rows,$num_cols)"
@@ -567,7 +566,7 @@ func _get_powerlaw_dataset_csr($num_rows, $num_cols, $density=0.1, $dtype='float
     }
     else
     {
-        return $output_arr->tostype("csr");
+        return mx->nd->array($output_arr)->tostype("csr");
     }
 }
 
