@@ -704,141 +704,169 @@ sub test_create_row_sparse
 
 test_create_row_sparse();
 
+sub test_create_sparse_nd_infer_shape
+{
+    my $check_create_csr_infer_shape = sub { my ($shape, $density, $dtype) = @_;
+        eval {
+            my $matrix = rand_ndarray($shape, 'csr', $density);
+            my $data = $matrix->data;
+            my $indptr = $matrix->indptr;
+            my $indices = $matrix->indices;
+            my $nd = mx->nd->sparse->csr_matrix([$data, $indices, $indptr], dtype=>$dtype);
+            my ($num_rows, $num_cols) = @{ $nd->shape };
+            ok($num_rows == @{ $indptr } - 1);
+            ok($indices->shape->[0] > 0);
+            ok(($num_cols <= $indices)->aspdl->sum == 0);
+            ok($nd->dtype eq $dtype);
+        };
+    };
+    my $check_create_rsp_infer_shape = sub { my ($shape, $density, $dtype) = @_;
+        eval {
+            my $array = rand_ndarray($shape, 'row_sparse', $density);
+            my $data = $array->data;
+            my $indices = $array->indices;
+            my $nd = mx->nd->sparse->row_sparse_array([$data, $indices], dtype=>$dtype);
+            my $inferred_shape = $nd->shape;
+            is_deeply([@{ $inferred_shape }[1..@{ $inferred_shape }-1]], [@{ $data->shape }[1..@{ $data->shape }-1]]);
+            ok($indices->ndim > 0);
+            ok($nd->dtype eq $dtype);
+            if($indices->shape->[0] > 0)
+            {
+                ok(($inferred_shape->[0] <= $indices)->aspdl->sum == 0);
+            }
+        };
+    };
+
+    my $dtype = 'int32';
+    my $shape = rand_shape_2d();
+    my $shape_3d = rand_shape_3d();
+    my @densities = (0, 0.5, 1);
+    for my $density (@densities)
+    {
+        $check_create_csr_infer_shape->($shape, $density, $dtype);
+        $check_create_rsp_infer_shape->($shape, $density, $dtype);
+        $check_create_rsp_infer_shape->($shape_3d, $density, $dtype);
+    }
+}
+
+test_create_sparse_nd_infer_shape();
+
+sub test_create_sparse_nd_from_dense
+{
+    my $check_create_from_dns = sub { my ($shape, $f, $dense_arr, $dtype, $default_dtype, $ctx) = @_;
+        my $arr = $f->($dense_arr, shape => $shape, dtype => $dtype, ctx => $ctx);
+        ok(same($arr->aspdl, pones(reverse @{ $shape })));
+        ok($arr->dtype eq $dtype);
+        ok($arr->context eq $ctx);
+        # verify the default dtype inferred from dense arr
+        my $arr2 = $f->($dense_arr);
+        ok($arr2->dtype eq $default_dtype);
+        ok($arr2->context eq AI::MXNet::Context->current_ctx);
+    };
+    my $shape = rand_shape_2d();
+    my $dtype = 'int32';
+    my $src_dtype = 'float64';
+    my $ctx = mx->cpu(1);
+    my @dense_arrs = (
+        mx->nd->ones($shape, dtype=>$src_dtype),
+        mx->nd->ones($shape, dtype=>$src_dtype)->aspdl
+    );
+    for my $f (sub { mx->nd->sparse->csr_matrix(@_) }, sub { mx->nd->sparse->row_sparse_array(@_) })
+    {
+        for my $dense_arr (@dense_arrs)
+        {
+            my $default_dtype = blessed($dense_arr) ? $dense_arr->dtype : 'float32';
+            $check_create_from_dns->($shape, $f, $dense_arr, $dtype, $default_dtype, $ctx);
+        }
+    }
+}
+
+test_create_sparse_nd_from_dense();
+
+sub test_create_sparse_nd_from_sparse
+{
+    my $check_create_from_sp = sub { my ($shape, $f, $sp_arr, $dtype, $src_dtype, $ctx) = @_;
+        my $arr = $f->($sp_arr, shape => $shape, dtype=>$dtype, ctx=>$ctx);
+        ok(same($arr->aspdl, pones(reverse @{ $shape })));
+        ok($arr->dtype eq $dtype);
+        ok($arr->context eq $ctx);
+        # verify the default dtype inferred from sparse arr
+        my $arr2 = $f->($sp_arr);
+        ok($arr2->dtype eq $src_dtype);
+        ok($arr2->context eq AI::MXNet::Context->current_ctx);
+    };
+
+    my $shape = rand_shape_2d();
+    my $src_dtype = 'float64';
+    my $dtype = 'int32';
+    my $ctx = mx->cpu(1);
+    my $ones = mx->nd->ones($shape, dtype=>$src_dtype);
+    my @csr_arrs = ($ones->tostype('csr'));
+    my @rsp_arrs = ($ones->tostype('row_sparse'));
+    push @csr_arrs, mx->nd->ones($shape, dtype=>$src_dtype)->aspdl->tocsr;
+    my $f_csr = sub { mx->nd->sparse->csr_matrix(@_) };
+    my $f_rsp = sub { mx->nd->sparse->row_sparse_array(@_) };
+    for my $sp_arr (@csr_arrs)
+    {
+        $check_create_from_sp->($shape, $f_csr, $sp_arr, $dtype, $src_dtype, $ctx);
+    }
+    for my $sp_arr (@rsp_arrs)
+    {
+        $check_create_from_sp->($shape, $f_rsp, $sp_arr, $dtype, $src_dtype, $ctx);
+    }
+}
+
+test_create_sparse_nd_from_sparse();
+
+sub test_create_sparse_nd_empty
+{
+    my $check_empty = sub { my ($shape, $stype) = @_;
+        my $arr = mx->nd->sparse->empty($stype, $shape);
+        ok($arr->stype eq $stype);
+        ok(same($arr->aspdl, pzeros(reverse(@{ $shape }))));
+    };
+
+    my $check_csr_empty = sub { my ($shape, $dtype, $ctx) = @_;
+        my $arr = mx->nd->sparse->csr_matrix(undef, shape => $shape, dtype => $dtype, ctx => $ctx);
+        ok($arr->stype eq 'csr');
+        ok($arr->dtype eq $dtype);
+        ok($arr->context eq $ctx);
+        ok(same($arr->aspdl, pzeros(reverse(@{ $shape }))));
+        # check the default value for dtype and ctx
+        $arr = mx->nd->sparse->csr_matrix(undef, shape => $shape);
+        ok($arr->dtype eq 'float32');
+        ok($arr->context eq AI::MXNet::Context->current_ctx);
+    };
+
+    my $check_rsp_empty = sub { my ($shape, $dtype, $ctx) = @_;
+        my $arr = mx->nd->sparse->row_sparse_array(undef, shape => $shape, dtype=>$dtype, ctx=>$ctx);
+        ok($arr->stype eq 'row_sparse');
+        ok($arr->dtype eq $dtype);
+        ok($arr->context eq $ctx);
+        ok(same($arr->aspdl, pzeros(reverse(@{ $shape }))));
+        # check the default value for dtype and ctx
+        $arr = mx->nd->sparse->row_sparse_array(undef, shape => $shape);
+        ok($arr->dtype eq 'float32');
+        ok($arr->context eq AI::MXNet::Context->current_ctx);
+    };
+
+    my @stypes = ('csr', 'row_sparse');
+    my $shape = rand_shape_2d();
+    my $shape_3d = rand_shape_3d();
+    my $dtype = 'int32';
+    my $ctx = mx->cpu(1);
+    for my $stype (@stypes)
+    {
+        $check_empty->($shape, $stype);
+    }
+    $check_csr_empty->($shape, $dtype, $ctx);
+    $check_rsp_empty->($shape, $dtype, $ctx);
+    $check_rsp_empty->($shape_3d, $dtype, $ctx);
+}
+
+test_create_sparse_nd_empty();
+
 __END__
-
-def test_create_sparse_nd_infer_shape():
-    def check_create_csr_infer_shape(shape, density, dtype):
-        try:
-            matrix = rand_ndarray(shape, 'csr', density=density)
-            data = matrix.data
-            indptr = matrix.indptr
-            indices = matrix.indices
-            nd = mx.nd.sparse.csr_matrix((data, indices, indptr), dtype=dtype)
-            num_rows, num_cols = nd.shape
-            assert(num_rows == len(indptr) - 1)
-            assert(indices.shape[0] > 0), indices
-            assert(np.sum((num_cols <= indices).asnumpy()) == 0)
-            assert(nd.dtype == dtype), (nd.dtype, dtype)
-        # cannot infer on invalid shape
-        except ValueError:
-            pass
-
-    def check_create_rsp_infer_shape(shape, density, dtype):
-        try:
-            array = rand_ndarray(shape, 'row_sparse', density=density)
-            data = array.data
-            indices = array.indices
-            nd = mx.nd.sparse.row_sparse_array((data, indices), dtype=dtype)
-            inferred_shape = nd.shape
-            assert(inferred_shape[1:] == data.shape[1:])
-            assert(indices.ndim > 0)
-            assert(nd.dtype == dtype)
-            if indices.shape[0] > 0:
-                assert(np.sum((inferred_shape[0] <= indices).asnumpy()) == 0)
-        # cannot infer on invalid shape
-        except ValueError:
-            pass
-
-    dtype = np.int32
-    shape = rand_shape_2d()
-    shape_3d = rand_shape_3d()
-    densities = [0, 0.5, 1]
-    for density in densities:
-        check_create_csr_infer_shape(shape, density, dtype)
-        check_create_rsp_infer_shape(shape, density, dtype)
-        check_create_rsp_infer_shape(shape_3d, density, dtype)
-
-def test_create_sparse_nd_from_dense():
-    def check_create_from_dns(shape, f, dense_arr, dtype, default_dtype, ctx):
-        arr = f(dense_arr, dtype=dtype, ctx=ctx)
-        assert(same(arr.asnumpy(), np.ones(shape)))
-        assert(arr.dtype == dtype)
-        assert(arr.context == ctx)
-        # verify the default dtype inferred from dense arr
-        arr2 = f(dense_arr)
-        assert(arr2.dtype == default_dtype)
-        assert(arr2.context == Context.default_ctx)
-    shape = rand_shape_2d()
-    dtype = np.int32
-    src_dtype = np.float64
-    ctx = mx.cpu(1)
-    dense_arrs = [mx.nd.ones(shape, dtype=src_dtype), np.ones(shape, dtype=src_dtype), \
-                  np.ones(shape, dtype=src_dtype).tolist()]
-    for f in [mx.nd.sparse.csr_matrix, mx.nd.sparse.row_sparse_array]:
-        for dense_arr in dense_arrs:
-            default_dtype = dense_arr.dtype if isinstance(dense_arr, (NDArray, np.ndarray)) \
-                            else np.float32
-            check_create_from_dns(shape, f, dense_arr, dtype, default_dtype, ctx)
-
-def test_create_sparse_nd_from_sparse():
-    def check_create_from_sp(shape, f, sp_arr, dtype, src_dtype, ctx):
-        arr = f(sp_arr, dtype=dtype, ctx=ctx)
-        assert(same(arr.asnumpy(), np.ones(shape)))
-        assert(arr.dtype == dtype)
-        assert(arr.context == ctx)
-        # verify the default dtype inferred from dense arr
-        arr2 = f(sp_arr)
-        assert(arr2.dtype == src_dtype)
-        assert(arr2.context == Context.default_ctx)
-
-    shape = rand_shape_2d()
-    src_dtype = np.float64
-    dtype = np.int32
-    ctx = mx.cpu(1)
-    ones = mx.nd.ones(shape, dtype=src_dtype)
-    csr_arrs = [ones.tostype('csr')]
-    rsp_arrs = [ones.tostype('row_sparse')]
-    try:
-        import scipy.sparse as spsp
-        csr_sp = spsp.csr_matrix(np.ones(shape, dtype=src_dtype))
-        csr_arrs.append(csr_sp)
-    except ImportError:
-        print("Could not import scipy.sparse. Skipping unit tests for scipy csr creation")
-    f_csr = mx.nd.sparse.csr_matrix
-    f_rsp = mx.nd.sparse.row_sparse_array
-    for sp_arr in csr_arrs:
-        check_create_from_sp(shape, f_csr, sp_arr, dtype, src_dtype, ctx)
-    for sp_arr in rsp_arrs:
-        check_create_from_sp(shape, f_rsp, sp_arr, dtype, src_dtype, ctx)
-
-def test_create_sparse_nd_empty():
-    def check_empty(shape, stype):
-        arr = mx.nd.empty(shape, stype=stype)
-        assert(arr.stype == stype)
-        assert same(arr.asnumpy(), np.zeros(shape))
-
-    def check_csr_empty(shape, dtype, ctx):
-        arr = mx.nd.sparse.csr_matrix(shape, dtype=dtype, ctx=ctx)
-        assert(arr.stype == 'csr')
-        assert(arr.dtype == dtype)
-        assert(arr.context == ctx)
-        assert same(arr.asnumpy(), np.zeros(shape))
-        # check the default value for dtype and ctx
-        arr = mx.nd.sparse.csr_matrix(shape)
-        assert(arr.dtype == np.float32)
-        assert(arr.context == Context.default_ctx)
-
-    def check_rsp_empty(shape, dtype, ctx):
-        arr = mx.nd.sparse.row_sparse_array(shape, dtype=dtype, ctx=ctx)
-        assert(arr.stype == 'row_sparse')
-        assert(arr.dtype == dtype)
-        assert(arr.context == ctx)
-        assert same(arr.asnumpy(), np.zeros(shape))
-        # check the default value for dtype and ctx
-        arr = mx.nd.sparse.row_sparse_array(shape)
-        assert(arr.dtype == np.float32)
-        assert(arr.context == Context.default_ctx)
-
-    stypes = ['csr', 'row_sparse']
-    shape = rand_shape_2d()
-    shape_3d = rand_shape_3d()
-    dtype = np.int32
-    ctx = mx.cpu(1)
-    for stype in stypes:
-        check_empty(shape, stype)
-    check_csr_empty(shape, dtype, ctx)
-    check_rsp_empty(shape, dtype, ctx)
-    check_rsp_empty(shape_3d, dtype, ctx)
 
 def test_synthetic_dataset_generator():
     def test_powerlaw_generator(csr_arr, final_row=1):

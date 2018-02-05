@@ -755,7 +755,8 @@ method _prepare_default_dtype($src_array, $dtype)
 use Data::Dumper;
 method _check_shape($s1, $s2)
 {
-    my ($ps1, $ps2) = map { blessed($_) ? pdl($_) : $_ } ($s1, $s2);
+    my ($ps1, $ps2) = map { (blessed($_) and $_->isa('AI::MXNet:NDArray')) ? pdl($_->shape) : blessed($_) ? $_ : pdl($_) } ($s1, $s2);
+    return 1 unless defined $s2;
     ($ps1 == $ps2)->all
         or
     confess("Shape mismatch detected. " . Dumper(blessed ($s1) ? $s1->undpl : $s1 ) . " v.s. " . Dumper(blessed ($s2) ? $s2 : $s2));
@@ -843,14 +844,17 @@ method coo_matrix(@args)
     --------
     CSRNDArray : MXNet NDArray in compressed sparse row format.
 =cut
-
 method csr_matrix(
     $arg1,
-    Maybe[Shape|PDL]              :$shape=,
+    Maybe[Shape|PDL]          :$shape=,
     Maybe[AI::MXNet::Context] :$ctx=AI::MXNet::Context->current_ctx,
     Maybe[Dtype]              :$dtype=
 )
 {
+    if(not defined $arg1)
+    {
+        return __PACKAGE__->empty('csr', $shape, ctx => $ctx, (defined $dtype ? (dtype => $dtype) : ()));
+    }
     # construct a csr matrix from (M, N) or (data, indices, indptr)
     if(ref $arg1 eq 'ARRAY')
     {
@@ -882,13 +886,13 @@ method csr_matrix(
         }
         else
         {
-            raise ValueError("Unexpected length of input array: " . Dumper($arg1));
+            confess("Unexpected length of input array: " . Dumper($arg1));
         }
     }
     else
     {
         # construct a csr matrix from a sparse / dense one
-        if(blessed $arg1 and $arg1->isa('AI::MXNet::NDArray::CSR' or $arg1->isa('PDL::CCS::Nd')))
+        if(blessed $arg1 and ($arg1->isa('AI::MXNet::NDArray::CSR') or $arg1->isa('PDL::CCS::Nd')))
         {
             # construct a csr matrix from scipy or CSRNDArray
             __PACKAGE__->_check_shape($arg1->shape, $shape);
@@ -1024,9 +1028,13 @@ method row_sparse_array(
     $arg1,
     Maybe[Shape]              :$shape=,
     Maybe[AI::MXNet::Context] :$ctx=AI::MXNet::Context->current_ctx,
-    Maybe[Dtype]              :$dtype='float32'
+    Maybe[Dtype]              :$dtype=
 )
 {
+    if(not defined $arg1)
+    {
+        return __PACKAGE__->empty('row_sparse', $shape, ctx => $ctx, (defined $dtype ? (dtype => $dtype) : ()));
+    }
     # construct a row sparse array from (D0, D1 ..) or (data, indices)
     if(ref $arg1 eq 'ARRAY')
     {
@@ -1273,7 +1281,7 @@ method array(
     Maybe[PDL] :$pdl=
 )
 {
-    if(not blessed $source_array  or $source_array->isa('PDL'))
+    if(not blessed $source_array  or $source_array->isa('PDL') or ($source_array->isa('AI::MXNet::NDArray') and $source_array->stype eq 'default'))
     {
         if(not ref $source_array)
         {
@@ -1310,7 +1318,7 @@ method array(
         $dtype = __PACKAGE__->_prepare_default_dtype($source_array, $dtype);
         return __PACKAGE__->csr_matrix(
             [$source_array->data, $source_array->indices, $source_array->indptr],
-            shape => $source_array->shape, dtype => $dtype, ctx => $ctx
+            shape => $source_array->shape , dtype => $dtype, ctx => $ctx
         );
     }
 }

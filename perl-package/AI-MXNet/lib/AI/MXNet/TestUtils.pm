@@ -651,12 +651,9 @@ func rand_sparse_ndarray(
         }
         else
         {
-            warn $density;
-            warn $shape->[0];
             my $idx_sample = random($shape->[0]);
             $indices = which($idx_sample < $density);
         }
-        warn "$indices";
         if($indices->shape(-1)->at(0) == 0)
         {
             my $result = mx->nd->zeros($shape, stype=>'row_sparse', dtype=>$dtype);
@@ -674,9 +671,7 @@ func rand_sparse_ndarray(
         {
             $val = assign_each($val, $modifier_func);
         }
-        warn "$val";
         my $arr = mx->nd->sparse->row_sparse_array([$val, $indices], shape=>$shape, dtype=>$dtype);
-        warn "here";
         return ($arr, [$val, $indices]);
     }
     elsif($stype eq 'csr')
