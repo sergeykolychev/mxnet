@@ -26,6 +26,21 @@ use AI::MXNet::TestUtils qw(zip assert enumerate same rand_shape_2d rand_shape_3
 use AI::MXNet::Base qw(pones pzeros pdl product rand_sparse);
 $ENV{MXNET_STORAGE_FALLBACK_LOG_VERBOSE} = 0;
 use Data::Dumper;
+
+sub dies_ok
+{
+    my $sub = shift;
+    eval { $sub->() };
+    if($@)
+    {
+        ok(1);
+    }
+    else
+    {
+        ok(0);
+    }
+}
+
 sub sparse_nd_ones
 {
     my ($shape, $stype) = @_;
@@ -901,96 +916,105 @@ sub test_synthetic_dataset_generator
 
 test_synthetic_dataset_generator();
 
-__END__
+sub test_sparse_nd_fluent
+{
+    my $check_fluent_regular = sub { my ($stype, $func, $kwargs, $shape, $equal_nan) = @_;
+        $shape //= [5, 17];
+        my $data = mx->nd->random->uniform(shape=>$shape)->tostype($stype);
+        my $regular = AI::MXNet::NDArray::Base->$func($data, %$kwargs);
+        my $fluent  = $data->$func(%$kwargs);
+        ok(almost_equal($regular->aspdl, $fluent->aspdl));
+    };
 
-def test_sparse_nd_fluent():
-    def check_fluent_regular(stype, func, kwargs, shape=(5, 17), equal_nan=False):
-        with mx.name.NameManager():
-            data = mx.nd.random_uniform(shape=shape, ctx=default_context()).tostype(stype)
-            regular = getattr(mx.ndarray, func)(data, **kwargs)
-            fluent = getattr(data, func)(**kwargs)
-            if isinstance(regular, list):
-                for r, f in zip(regular, fluent):
-                    assert almost_equal(r.asnumpy(), f.asnumpy(), equal_nan=equal_nan)
-            else:
-                assert almost_equal(regular.asnumpy(), fluent.asnumpy(), equal_nan=equal_nan)
+    my @common_func = ('zeros_like', 'square');
+    my @rsp_func = ('round', 'rint', 'fix', 'floor', 'ceil', 'trunc',
+                'abs', 'sign', 'sin', 'degrees', 'radians', 'expm1');
+    for my $func (@common_func)
+    {
+        $check_fluent_regular->('csr', $func, {});
+    }
+    for my $func (@common_func, @rsp_func)
+    {
+        $check_fluent_regular->('row_sparse', $func, {});
+    }
 
-    common_func = ['zeros_like', 'square']
-    rsp_func = ['round', 'rint', 'fix', 'floor', 'ceil', 'trunc',
-                'abs', 'sign', 'sin', 'degrees', 'radians', 'expm1']
-    for func in common_func:
-        check_fluent_regular('csr', func, {})
-    for func in common_func + rsp_func:
-        check_fluent_regular('row_sparse', func, {})
+    @rsp_func = ('arcsin', 'arctan', 'tan', 'sinh', 'tanh',
+                'arcsinh', 'arctanh', 'log1p', 'sqrt', 'relu');
+    for my $func (@rsp_func)
+    {
+        $check_fluent_regular->('row_sparse', $func, {});
+    }
 
-    rsp_func = ['arcsin', 'arctan', 'tan', 'sinh', 'tanh',
-                'arcsinh', 'arctanh', 'log1p', 'sqrt', 'relu']
-    for func in rsp_func:
-        check_fluent_regular('row_sparse', func, {}, equal_nan=True)
+    $check_fluent_regular->('csr', 'slice', {begin => [2, 5], end => [4, 7]});
+    $check_fluent_regular->('row_sparse', 'clip', {a_min => -0.25, a_max => 0.75});
 
-    check_fluent_regular('csr', 'slice', {'begin': (2, 5), 'end': (4, 7)}, shape=(5, 17))
-    check_fluent_regular('row_sparse', 'clip', {'a_min': -0.25, 'a_max': 0.75})
+    for my $func ('sum', 'mean')
+    {
+        $check_fluent_regular->('csr', $func, {axis => 0});
+    }
+}
 
-    for func in ['sum', 'mean']:
-        check_fluent_regular('csr', func, {'axis': 0})
+test_sparse_nd_fluent();
 
+sub test_sparse_nd_exception
+{
+    my $a = mx->nd->ones([2,2]);
+    dies_ok(sub { mx->nd->sparse->retain($a, invalid_arg=>"garbage_value") });
+    dies_ok(sub { mx->nd->sparse->csr_matrix($a, shape=>[3,2]) });
+    dies_ok(sub { mx->nd->sparse->csr_matrix(pdl([2,2]), shape=>[3,2]) });
+    dies_ok(sub { mx->nd->sparse->row_sparse_array(pdl([2,2]), shape=>[3,2]) });
+    dies_ok(sub { mx->nd->sparse->zeros("invalid_stype", [2,2]) });
+}
 
-def test_sparse_nd_exception():
-    """ test invalid sparse operator will throw a exception """
-    a = mx.nd.ones((2,2))
-    assertRaises(mx.base.MXNetError, mx.nd.sparse.retain, a, invalid_arg="garbage_value")
-    assertRaises(ValueError, mx.nd.sparse.csr_matrix, a, shape=(3,2))
-    assertRaises(ValueError, mx.nd.sparse.csr_matrix, (2,2), shape=(3,2))
-    assertRaises(ValueError, mx.nd.sparse.row_sparse_array, (2,2), shape=(3,2))
-    assertRaises(ValueError, mx.nd.sparse.zeros, "invalid_stype", (2,2))
+test_sparse_nd_exception();
 
-def test_sparse_nd_check_format():
-    """ test check_format for sparse ndarray """
-    shape = rand_shape_2d()
-    stypes = ["csr", "row_sparse"]
-    for stype in stypes:
-        arr, _ = rand_sparse_ndarray(shape, stype)
-        arr.check_format()
-        arr = mx.nd.sparse.zeros(stype, shape)
-        arr.check_format()
+sub test_sparse_nd_check_format
+{
+    my $shape = rand_shape_2d();
+    my @stypes = ("csr", "row_sparse");
+    for my $stype (@stypes)
+    {
+        my ($arr) = rand_sparse_ndarray($shape, $stype);
+        $arr->check_format();
+        $arr = mx->nd->sparse->zeros($stype, $shape);
+        $arr->check_format();
+    }
     # CSR format index pointer array should be less than the number of rows
-    shape = (3, 4)
-    data_list = [7, 8, 9]
-    indices_list = [0, 2, 1]
-    indptr_list = [0, 5, 2, 3]
-    a = mx.nd.sparse.csr_matrix((data_list, indices_list, indptr_list), shape=shape)
-    assertRaises(mx.base.MXNetError, a.check_format)
+    my $shape = [3, 4];
+    my $data_list = [7, 8, 9];
+    my $indices_list = [0, 2, 1];
+    my $indptr_list = [0, 5, 2, 3];
+    my $a = mx->nd->sparse->csr_matrix([$data_list, $indices_list, $indptr_list], shape=>$shape);
+    dies_ok(sub { $a->check_format });
     # CSR format indices should be in ascending order per row
-    indices_list = [2, 1, 1]
-    indptr_list = [0, 2, 2, 3]
-    a = mx.nd.sparse.csr_matrix((data_list, indices_list, indptr_list), shape=shape)
-    assertRaises(mx.base.MXNetError, a.check_format)
+    $indices_list = [2, 1, 1];
+    $indptr_list = [0, 2, 2, 3];
+    $a = mx->nd->sparse->csr_matrix([$data_list, $indices_list, $indptr_list], shape=>$shape);
+    dies_ok(sub { $a->check_format });
     # CSR format indptr should end with value equal with size of indices
-    indices_list = [1, 2, 1]
-    indptr_list = [0, 2, 2, 4]
-    a = mx.nd.sparse.csr_matrix((data_list, indices_list, indptr_list), shape=shape)
-    assertRaises(mx.base.MXNetError, a.check_format)
+    $indices_list = [1, 2, 1];
+    $indptr_list = [0, 2, 2, 4];
+    my $a = mx->nd->sparse->csr_matrix([$data_list, $indices_list, $indptr_list], shape=>$shape);
+    dies_ok(sub { $a->check_format });
     # CSR format indices should not be negative
-    indices_list = [0, 2, 1]
-    indptr_list = [0, -2, 2, 3]
-    a = mx.nd.sparse.csr_matrix((data_list, indices_list, indptr_list), shape=shape)
-    assertRaises(mx.base.MXNetError, a.check_format)
+    $indices_list = [0, 2, 1];
+    $indptr_list = [0, -2, 2, 3];
+    my $a = mx->nd->sparse->csr_matrix([$data_list, $indices_list, $indptr_list], shape=>$shape);
+    dies_ok(sub { $a->check_format });
     # Row Sparse format indices should be less than the number of rows
-    shape = (3, 2)
-    data_list = [[1, 2], [3, 4]]
-    indices_list = [1, 4]
-    a = mx.nd.sparse.row_sparse_array((data_list, indices_list), shape=shape)
-    assertRaises(mx.base.MXNetError, a.check_format)
+    $shape = [3, 2];
+    $data_list = [[1, 2], [3, 4]];
+    $indices_list = [1, 4];
+    $a = mx->nd->sparse->row_sparse_array([$data_list, $indices_list], shape=>$shape);
+    dies_ok(sub { $a->check_format });
     # Row Sparse format indices should be in ascending order
-    indices_list = [1, 0]
-    a = mx.nd.sparse.row_sparse_array((data_list, indices_list), shape=shape)
-    assertRaises(mx.base.MXNetError, a.check_format)
+    $indices_list = [1, 0];
+    $a = mx->nd->sparse->row_sparse_array([$data_list, $indices_list], shape=>$shape);
+    dies_ok(sub { $a->check_format });
     # Row Sparse format indices should not be negative
-    indices_list = [1, -2]
-    a = mx.nd.sparse.row_sparse_array((data_list, indices_list), shape=shape)
-    assertRaises(mx.base.MXNetError, a.check_format)
+    $indices_list = [1, -2];
+    $a = mx->nd->sparse->row_sparse_array([$data_list, $indices_list], shape=>$shape);
+    dies_ok(sub { $a->check_format });
+}
 
-
-if __name__ == '__main__':
-    import nose
-    nose.runmodule()
+test_sparse_nd_check_format();
