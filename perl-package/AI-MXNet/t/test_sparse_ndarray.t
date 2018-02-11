@@ -15,7 +15,6 @@
 # specific language governing permissions and limitations
 # under the License.
 
-use lib '../lib';
 use strict;
 use warnings;
 use Scalar::Util qw(blessed);
@@ -980,7 +979,7 @@ sub test_sparse_nd_check_format
         $arr->check_format();
     }
     # CSR format index pointer array should be less than the number of rows
-    my $shape = [3, 4];
+    $shape = [3, 4];
     my $data_list = [7, 8, 9];
     my $indices_list = [0, 2, 1];
     my $indptr_list = [0, 5, 2, 3];
@@ -994,12 +993,12 @@ sub test_sparse_nd_check_format
     # CSR format indptr should end with value equal with size of indices
     $indices_list = [1, 2, 1];
     $indptr_list = [0, 2, 2, 4];
-    my $a = mx->nd->sparse->csr_matrix([$data_list, $indices_list, $indptr_list], shape=>$shape);
+    $a = mx->nd->sparse->csr_matrix([$data_list, $indices_list, $indptr_list], shape=>$shape);
     dies_ok(sub { $a->check_format });
     # CSR format indices should not be negative
     $indices_list = [0, 2, 1];
     $indptr_list = [0, -2, 2, 3];
-    my $a = mx->nd->sparse->csr_matrix([$data_list, $indices_list, $indptr_list], shape=>$shape);
+    $a = mx->nd->sparse->csr_matrix([$data_list, $indices_list, $indptr_list], shape=>$shape);
     dies_ok(sub { $a->check_format });
     # Row Sparse format indices should be less than the number of rows
     $shape = [3, 2];

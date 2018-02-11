@@ -1449,29 +1449,21 @@ int MXExecutorSimpleBind(SymbolHandle symbol_handle,
                          const mx_uint num_provided_arg_dtypes,
                          const char** in, // provided_arg_dtype_names,
                          const int* in, // provided_arg_dtypes,
-
-//---------------        sparse related variables, ignored for now
                          const mx_uint num_provided_arg_stypes,
-                         const char** provided_arg_stype_names,
-                         const int* provided_arg_stypes,
-//---------------
+                         const char** in, // provided_arg_stype_names,
+                         const int* in, // provided_arg_stypes,
                          const mx_uint num_shared_arg_names,
                          const char** in, // shared_arg_name_list,
-//------------
                          int* shared_buffer_len,
                          const char** shared_buffer_name_list,
                          NDArrayHandle* shared_buffer_handle_list,
                          const char*** updated_shared_buffer_name_list,
                          NDArrayHandle** updated_shared_buffer_handle_list,
-//------------------
-
                          mx_uint* num_in_args,
                          NDArrayHandle** in_args,
                          NDArrayHandle** arg_grads,
-//-----------------
                          mx_uint* num_aux_states,
                          NDArrayHandle** aux_states,
-//----------
                          ExecutorHandle shared_exec_handle,
                          ExecutorHandle* out
 );

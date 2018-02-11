@@ -778,6 +778,9 @@ method _get_ndarray_inputs(
     :$type_dict  : hash ref of str->Dtype
         Input type map, name->dtype
 
+    :$type_dict  : hash ref of str->Stype
+        Storage type map, name->stype (for sparse operations)
+
     :$group2ctx : hash ref of string to AI::MXNet::Context
         The mapping of the ctx_group attribute to the context assignment.
 
@@ -808,13 +811,14 @@ method simple_bind(
     GradReq|ArrayRef[GradReq]|HashRef[GradReq]     :$grad_req='write',
     Maybe[HashRef[Shape]]                          :$shapes=,
     Maybe[HashRef[Dtype]]                          :$type_dict=,
+    Maybe[HashRef[Stype]]                          :$stype_dict=,
     Maybe[HashRef[AI::MXNet::Context]]             :$group2ctx=,
     Maybe[ArrayRef[Str]]                           :$shared_arg_names=,
     Maybe[AI::MXNet::Executor]                     :$shared_exec=,
     Maybe[HashRef[AI::MXNet::NDArray]]             :$shared_buffer=
 )
 {
-    my $num_provided_arg_types;
+    my $num_provided_arg_types = 0;
     my @provided_arg_type_names;
     my @provided_arg_type_data;
     if(defined $type_dict)
@@ -825,6 +829,18 @@ method simple_bind(
             push @provided_arg_type_data, DTYPE_STR_TO_MX->{$v};
         }
         $num_provided_arg_types = @provided_arg_type_names;
+    }
+    my $num_provided_arg_stypes = 0;
+    my @provided_arg_stype_names;
+    my @provided_arg_stype_data;
+    if(defined $stype_dict)
+    {
+        while(my ($k, $v) = each %{ $stype_dict })
+        {
+            push @provided_arg_stype_names, $k;
+            push @provided_arg_stype_data, STORAGE_TYPE_STR_TO_ID->{$v};
+        }
+        $num_provided_arg_stypes = @provided_arg_stype_names;
     }
     my @provided_arg_shape_data;
     # argument shape index in sdata,
@@ -923,6 +939,9 @@ method simple_bind(
                 $num_provided_arg_types,
                 \@provided_arg_type_names,
                 \@provided_arg_type_data,
+                $num_provided_arg_stypes,
+                \@provided_arg_stype_names,
+                \@provided_arg_stype_data,
                 scalar(@shared_arg_name_list),
                 \@shared_arg_name_list,
                 defined $shared_buffer ? \%shared_data : undef,
