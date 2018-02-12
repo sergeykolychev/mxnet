@@ -378,9 +378,9 @@ method update(
     Maybe[AI::MXNet::NDArray|ArrayRef[Maybe[AI::MXNet::NDArray]]] $state
 )
 {
+    $self->_update_count($index);
     my $lr = $self->_get_lr($index);
     my $wd = $self->_get_wd($index);
-    $self->_update_count($index);
     my $kwargs = {
         out => $weight,
         lr  => $lr,
