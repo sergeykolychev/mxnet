@@ -321,6 +321,7 @@ extends 'AI::MXNet::Optimizer';
 has '+learning_rate' => (default => 0.01);
 has 'momentum'       => (is => "ro", isa => "Num",  default => 0);
 has 'multi_precision' => (is => 'ro', isa => 'Bool', default => 0);
+has 'lazy_update' => (is => 'ro', isa => 'Bool', default => 1);
 
 method create_state($index, $weight)
 {
@@ -347,7 +348,7 @@ method update($index, $weight, $grad, $state)
         {
             my $grad_row = $grad->at($row);
             my $all_zeros = almost_equal($grad_row->aspdl, mx->nd->zeros($grad_row->shape, ctx => $grad_row->context, dtype => $grad_row->dtype)->aspdl);
-            if($all_zeros)
+            if($all_zeros and $self->lazy_update)
             {
                 next;
             }
@@ -374,7 +375,7 @@ method update($index, $weight, $grad, $state)
         {
             my $grad_row = $grad->at($row);
             my $all_zeros = almost_equal($grad_row->aspdl, mx->nd->zeros($grad_row->shape, ctx => $grad_row->context, dtype => $grad_row->dtype)->aspdl);
-            if($all_zeros)
+            if($all_zeros and $self->lazy_update)
             {
                 next;
             }
@@ -397,7 +398,7 @@ method update($index, $weight, $grad, $state)
 
 package main;
 use Carp;
-use Test::More tests => 1314;
+use Test::More tests => 1854;
 use AI::MXNet::Base;
 use PDL::NiceSlice;
 use AI::MXNet::TestUtils qw(same reldiff almost_equal rand_ndarray);
@@ -619,7 +620,7 @@ sub test_std_sparse_sgd
                         %kwarg = (%kwarg, %$cg_option);
                         %kwarg = (%kwarg, %$rg_option);
                         %kwarg = (%kwarg, %$wd_option);
-                        compare_optimizer($opt1->new(%kwarg), $opt2->new(lazy_update => 0, %kwarg), $shape, $dtype, 'row_sparse', 'row_sparse');
+                        compare_optimizer($opt1->new(lazy_update => 0, %kwarg), $opt2->new(lazy_update => 0, %kwarg), $shape, $dtype, 'row_sparse', 'row_sparse');
                     }
                 }
             }
@@ -846,7 +847,6 @@ def test_ftml():
                             compare_optimizer(opt1(**kwarg), opt2(**kwarg), shape, dtype)
 
 
-# ADAM
 
 class PyAdam(mx.optimizer.Optimizer):
     """python reference implemenation of adam"""
