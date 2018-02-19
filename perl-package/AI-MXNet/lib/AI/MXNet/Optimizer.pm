@@ -581,11 +581,12 @@ method update(
         epsilon => $self->epsilon,
         rescale_grad => $self->rescale_grad
     );
+use Data::Dumper;
     if($self->clip_gradient)
     {
-        $kwargs{clip_gradient} = $self->clip_gradient;
+        $kwargs{clip_grad} = $self->clip_gradient;
     }
-    AI::MXNet::NDArray->ftml_update($weight, $grad, @{ $state }, %kwargs);
+    AI::MXNet::NDArray->ftml_update($weight, $grad, @{ $state }, \%kwargs);
 }
 
 __PACKAGE__->register;
@@ -994,41 +995,83 @@ __PACKAGE__->register;
 
 package AI::MXNet::NAG;
 use Mouse;
-
 extends 'AI::MXNet::SGD';
 
-method update(
-    Index $index,
-    AI::MXNet::NDArray $weight,
-    AI::MXNet::NDArray $grad,
-    AI::MXNet::NDArray|Undef $state
-)
+method create_state(Index $index, AI::MXNet::NDArray $weight)
+{
+    my $momentum;
+    my $weight_master_copy;
+    my $do_multi_precision = ($self->multi_precision and $weight->dtype eq 'float16');
+    if($do_multi_precision)
+    {
+        if($self->momentum != 0)
+        {
+            $momentum = AI::MXNet::NDArray->zeros($weight->shape, ctx => $weight->context, dtype=>'float32');
+        }
+        $weight_master_copy = AI::MXNet::NDArray->array($weight, ctx=>$weight->context, dtype=>'float32');
+        return [$weight_master_copy, $momentum];
+    }
+    else
+    {
+        if($self->momentum != 0)
+        {
+            $momentum = AI::MXNet::NDArray->zeros($weight->shape, ctx => $weight->context, dtype=>$weight->dtype);
+        }
+        return $momentum;
+    }
+}
+
+method update($index, $weight, $grad, $state)
 {
     my $lr = $self->_get_lr($index);
     my $wd = $self->_get_wd($index);
     $self->_update_count($index);
-    $grad = $grad * $self->rescale_grad;
-    if($self->clip_gradient)
+    my $use_multi_precision = (defined $state and not Scalar::Util::blessed($state) and ref($state eq 'ARRAY'));
+    if(not $use_multi_precision)
     {
-        $grad = AI::MXNet::NDArray->clip(
-            $grad,
-            -$self->clip_gradient,
-            $self->clip_gradient
-        );
-    }
-    if($state)
-    {
-        my $mom  = $state;
-        $mom    *= $self->momentum;
-        $grad   += $wd * $weight;
-        $mom    += $grad;
-        $grad   += $self->momentum * $mom;
-        $weight += -$lr * $grad;
+        $grad *= $self->rescale_grad;
+        if(defined $self->clip_gradient)
+        {
+            $grad = AI::MXNet::NDArray->clip($grad, -$self->clip_gradient, $self->clip_gradient);
+        }
+        if($self->momentum == 0)
+        {
+            $weight += -$lr * ($grad + $wd * $weight);
+        }
+        else
+        {
+            my $mom = $state;
+            $mom *= $self->momentum;
+            $grad += $wd * $weight;
+            $mom += $grad;
+            $grad += $self->momentum * $mom;
+            $weight += -$lr * $grad;
+        }
     }
     else
     {
-        confess("momentum != 0") unless $self->momentum == 0;
-        $weight += -$lr * ($grad + $wd * $weight);
+        my $grad32 = AI::MXNet::NDArray->array($grad, ctx=>$grad->context, dtype=>'float32');
+        $grad32 *= $self->rescale_grad;
+        if(defined $self->clip_gradient)
+        {
+            $grad32 = AI::MXNet::NDArray->clip($grad32, -$self->clip_gradient, $self->clip_gradient);
+        }
+        my $mom = $state->[1];
+        my $weight32 = $state->[0];
+        if($self->momentum == 0)
+        {
+            $weight32 += -$lr * ($grad32 + $wd * $weight32);
+        }
+        else
+        {
+            $mom *= $self->momentum;
+            $grad32 += $wd * $weight32;
+            $mom += $grad32;
+            $grad32 += $self->momentum * $mom;
+            $weight32 += -$lr * $grad32;
+        }
+        my $tmp = $weight32->astype($weight->dtype);
+        $tmp->copyto($weight);
     }
 }
 
@@ -1638,7 +1681,7 @@ use Mouse;
 extends 'AI::MXNet::Optimizer';
 has '+learning_rate' => (default => 0.1);
 has 'beta'           => (is => "ro", isa => "Num",  default => 1);
-has 'lambda1'        => (is => "ro", isa => "Num",  default => 0.01);
+has 'lamda1'         => (is => "ro", isa => "Num",  default => 0.01);
 
 method create_state(Index $index, AI::MXNet::NDArray $weight)
 {
@@ -1674,8 +1717,8 @@ method update(
     # accumulated g and delta initialization
     my ($z, $n) = @{ $state };
     AI::MXNet::NDArray->ftrl_update(
-        $weight, $grad, $z, $n, out => $weight,
-        lr => $lr, wd => $wd, %kwargs
+        $weight, $grad, $z, $n,
+        { lr => $lr, wd => $wd, %kwargs, out => $weight }
     );
 }
 
