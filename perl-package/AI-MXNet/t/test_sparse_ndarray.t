@@ -21,24 +21,11 @@ use Scalar::Util qw(blessed);
 use Test::More 'no_plan';
 use AI::MXNet qw(mx);
 use AI::MXNet::TestUtils qw(zip assert enumerate same rand_shape_2d rand_shape_3d
-    rand_sparse_ndarray random_arrays almost_equal rand_ndarray randint allclose);
+    rand_sparse_ndarray random_arrays almost_equal rand_ndarray randint allclose dies_ok);
 use AI::MXNet::Base qw(pones pzeros pdl product rand_sparse);
 $ENV{MXNET_STORAGE_FALLBACK_LOG_VERBOSE} = 0;
 use Data::Dumper;
 
-sub dies_ok
-{
-    my $sub = shift;
-    eval { $sub->() };
-    if($@)
-    {
-        ok(1);
-    }
-    else
-    {
-        ok(0);
-    }
-}
 
 sub sparse_nd_ones
 {

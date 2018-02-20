@@ -31,7 +31,7 @@ use Exporter;
 use base qw(Exporter);
 use List::Util qw(shuffle);
 
-@AI::MXNet::Base::EXPORT = qw(product enumerate assert zip check_call build_param_doc
+@AI::MXNet::Base::EXPORT = qw(product enumerate assert zip check_call build_param_doc pdlccs_shuffle
                               pdl cat dog svd bisect_left pdl_shuffle as_array ascsr rand_sparse
                               DTYPE_STR_TO_MX DTYPE_MX_TO_STR DTYPE_MX_TO_PDL
                               DTYPE_PDL_TO_MX DTYPE_MX_TO_PERL GRAD_REQ_MAP
@@ -239,6 +239,31 @@ sub pdl_shuffle
     }
     $c;
 }
+
+=head2 pdlccs_shuffle
+
+    Shuffle the two dimensional PDL::CCS::Nd by the last dimension
+
+    Parameters
+    -----------
+    PDL::CCS::Nd $pdl
+    $preshuffle Maybe[ArrayRef[Index]], if defined the array elements are used
+    as shuffled last dimension's indexes
+=cut
+
+
+sub pdlccs_shuffle
+{
+    my ($pdl, $preshuffle) = @_;
+    my $c = $pdl->copy;
+    my @shuffle = $preshuffle ? @{ $preshuffle } : shuffle(0..$pdl->dim(-1)-1);
+    for my $i (0..$pdl->dim(-1)-1)
+    {
+        $c->indexND(pdl([map { [$_, $i] } 0..$pdl->dim(0)-1])) .= $pdl->indexND(pdl([map { [$_, $shuffle[$i]] } 0..$pdl->dim(0)-1]))
+    }
+    $c;
+}
+
 
 =head2 assert
 

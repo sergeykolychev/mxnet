@@ -325,6 +325,14 @@ method slice(Slice|InternalSlice @slices)
     {
         ($begin, $end) = @{ $slice };
         $end //= $self->shape->[0] - 1;
+        if($begin < 0)
+        {
+            $begin += $self->shape->[0];
+        }
+        if($end < 0)
+        {
+            $end += $self->shape->[0];
+        }
     }
     return $self->SUPER::slice(begin => $begin, end => $end + 1);
 }
