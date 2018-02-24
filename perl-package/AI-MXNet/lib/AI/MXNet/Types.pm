@@ -57,7 +57,6 @@ subtype "CudaKernelShape" => as "Shape" => where { @$_ == 3 };
 subtype "WholeDim"        => as "Str" => where { $_ eq 'X' };
 subtype "Slice"           => as "ArrayRef[Index]|WholeDim|Index" => where { ref $_ ? @$_ > 0 : 1 };
 subtype "Dtype"           => as enum([qw[float32 float64 float16 uint8 int8 int32 int64]]);
-subtype "ProfilerMode"    => as enum([qw[symbolic all]]);
 subtype "GluonClass"      => as enum([qw[AI::MXNet::NDArray AI::MXNet::Symbol]]);
 subtype "GluonInput"      => as "AI::MXNet::NDArray|AI::MXNet::Symbol|ArrayRef[AI::MXNet::NDArray|AI::MXNet::Symbol]";
 subtype "ProfilerState"   => as enum([qw[stop run]]);
