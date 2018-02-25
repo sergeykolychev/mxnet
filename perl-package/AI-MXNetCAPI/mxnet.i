@@ -1603,6 +1603,19 @@ int MXKVStoreCreate(const char *type,
 int MXKVStoreFree(KVStoreHandle handle);
 
 /*!
+ * \brief Set parameters to use low-bit compressed gradients
+ * \param handle handle to the kvstore
+ * \param keys keys for compression parameters
+ * \param vals values for compression parameters
+ * \return 0 when success, -1 when failure happens
+ */
+int MXKVStoreSetGradientCompression(KVStoreHandle handle,
+                                              mx_uint num_params,
+                                              const char** keys,
+                                              const char** vals);
+
+
+/*!
  * \brief Init a list of (key,value) pairs in kvstore, where each key is a string
  * \param handle handle to the kvstore
  * \param num the number of key-value pairs
