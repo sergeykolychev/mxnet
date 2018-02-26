@@ -1523,7 +1523,7 @@ method attach_grad(GradReq :$grad_req='write', Maybe[Str] :$stype=)
     my $grad;
     if(defined $stype)
     {
-        $grad = __PACKAGE__->_zeros($self->shape, stype=>$stype);
+        $grad = __PACKAGE__->zeros($self->shape, stype => $stype);
     }
     else
     {

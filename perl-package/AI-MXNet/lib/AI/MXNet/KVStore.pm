@@ -545,8 +545,8 @@ method _set_updater(Updater $updater_func)
             my ($index, $input_handle, $storage_handle) = @_;
             $updater_func->(
                 $index,
-                AI::MXNet::NDArray->new(handle => $input_handle),
-                AI::MXNet::NDArray->new(handle => $storage_handle)
+                AI::MXNet::NDArray->_ndarray_cls($input_handle),
+                AI::MXNet::NDArray->_ndarray_cls($storage_handle)
             );
         }
     );

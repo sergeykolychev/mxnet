@@ -734,13 +734,13 @@ method iter_next()
 method getdata()
 {
     my $handle = check_call(AI::MXNetCAPI::DataIterGetData($self->handle));
-    return AI::MXNet::NDArray->new(handle => $handle);
+    return AI::MXNet::NDArray->_ndarray_cls($handle);
 }
 
 method getlabel()
 {
     my $handle = check_call(AI::MXNetCAPI::DataIterGetLabel($self->handle));
-    return AI::MXNet::NDArray->new(handle => $handle);
+    return AI::MXNet::NDArray->_ndarray_cls($handle);
 }
 
 method getindex()

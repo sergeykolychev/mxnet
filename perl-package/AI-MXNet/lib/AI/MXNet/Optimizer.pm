@@ -44,7 +44,7 @@ method register()
 {
     my $name = $self;
     ($name) = $name =~ /::(\w+)$/;
-    {  no strict 'refs'; *{__PACKAGE__."::$name"} = sub { $self }; }
+    {  no strict 'refs'; *{__PACKAGE__."::$name"} = sub { shift; $self->new(@_)  }; }
     $name = lc $name;
     if(exists $opt_registry{ $name })
     {
@@ -1346,7 +1346,7 @@ method update(
             $div,
             AI::MXNet::NDArray->_mul_scalar(
                 $retained_weight, $wd
-                )
+            )
         );
         $weight .= AI::MXNet::NDArray::Sparse->elemwise_add(
             $weight,

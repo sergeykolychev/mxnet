@@ -962,12 +962,12 @@ method simple_bind(
     {
         while(my ($k, $v) = each %{ $updated_shared_data })
         {
-            $shared_buffer->{$k} = AI::MXNet::NDArray->new(handle => $v);
+            $shared_buffer->{$k} = AI::MXNet::NDArray->_ndarray_cls($v);
         }
     }
-    my @arg_arrays  = map { AI::MXNet::NDArray->new(handle => $_) } @{ $in_arg_handles };
-    my @grad_arrays = map { defined $_ ? AI::MXNet::NDArray->new(handle => $_) : undef  } @{ $arg_grad_handles };
-    my @aux_arrays  = map { AI::MXNet::NDArray->new(handle => $_) } @{ $aux_state_handles };
+    my @arg_arrays  = map { AI::MXNet::NDArray->_ndarray_cls($_) } @{ $in_arg_handles };
+    my @grad_arrays = map { defined $_ ? AI::MXNet::NDArray->_ndarray_cls($_) : undef  } @{ $arg_grad_handles };
+    my @aux_arrays  = map { AI::MXNet::NDArray->_ndarray_cls($_) } @{ $aux_state_handles };
     my $executor = AI::MXNet::Executor->new(
         handle    => $exe_handle,
         symbol    => $self,
@@ -1256,6 +1256,7 @@ method Variable(
     Maybe[Num]                    :$lr_mult=,
     Maybe[Num]                    :$wd_mult=,
     Maybe[Dtype]                  :$dtype=,
+    Maybe[Stype]                  :$stype=,
     Maybe[Initializer]            :$init=,
     HashRef[Str]                  :$kwargs={},
     Maybe[Str]                    :$__layout__=
@@ -1270,6 +1271,7 @@ method Variable(
     $attr->{__dtype__}   = DTYPE_STR_TO_MX->{ $dtype } if $dtype;
     $attr->{__init__}    = "$init" if defined $init;
     $attr->{__layout__}  = $__layout__ if defined $__layout__;
+    $attr->{__storage_type__} = STORAGE_TYPE_STR_TO_ID->{$stype} if defined $stype;
     while(my ($k, $v) = each %{ $kwargs })
     {
         if($k =~ /^__/ and $k =~ /__$/)
@@ -1489,5 +1491,6 @@ sub  _ufunc_helper
 
 sub contrib { 'AI::MXNet::Contrib::Symbol' }
 sub random  { 'AI::MXNet::Symbol::Random' }
+sub sparse  { 'AI::MXNet::Symbol::Sparse' }
 
 1;

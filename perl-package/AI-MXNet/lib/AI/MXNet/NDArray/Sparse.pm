@@ -1331,4 +1331,12 @@ method array(
     }
 }
 
+sub AUTOLOAD {
+    my $sub = $AI::MXNet::NDArray::Sparse::AUTOLOAD;
+    $sub =~ s/.*:://;
+    $sub = "_sparse_$sub";
+    shift;
+    return AI::MXNet::NDArray->$sub(@_);
+}
+
 1;
