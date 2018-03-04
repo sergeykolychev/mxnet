@@ -80,6 +80,7 @@ sub import
             sub io { 'AI::MXNet::IO' }
             sub metric { 'AI::MXNet::Metric' }
             sub mod { 'AI::MXNet::Module' }
+            sub module { 'AI::MXNet::Module' }
             sub mon { 'AI::MXNet::Monitor' }
             sub viz { 'AI::MXNet::Visualization' }
             sub rnn { 'AI::MXNet::RNN' }
