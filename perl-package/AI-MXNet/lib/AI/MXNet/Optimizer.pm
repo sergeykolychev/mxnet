@@ -1294,8 +1294,7 @@ use Mouse;
 
 extends 'AI::MXNet::Optimizer';
 
-has 'float_stable_eps'    => (is => "rw", isa => "Num", default => 1e-7);
-has '+learning_rate'       => (default => 0.05);
+has 'eps'    => (is => "rw", isa => "Num", default => 1e-7);
 
 method create_state(Index $index, AI::MXNet::NDArray $weight)
 {
@@ -1317,47 +1316,28 @@ method update(
     my $wd = $self->_get_wd($index);
     $self->_update_count($index);
     my $is_sparse = ($weight->stype eq 'row_sparse' and $grad->stype eq 'row_sparse') ? 1 : 0;
-    my $grad_indices_count;
-    if($is_sparse)
-    {
-        $grad_indices_count = @{ $grad->indices };
-    }
-    $grad *= $self->rescale_grad;
-    if($self->clip_gradient)
-    {
-        $grad = AI::MXNet::NDArray->clip(
-            $grad,
-            -$self->clip_gradient,
-             $self->clip_gradient
-        );
-    }
     my $history = $state;
     if($is_sparse)
     {
-        $history .= AI::MXNet::NDArray::Sparse->elemwise_add(
-            AI::MXNet::NDArray::Sparse->square($grad),
-            AI::MXNet::NDArray::Sparse->retain($history, $grad->indices)
+        my %kwargs = (
+            epsilon => $self->eps,
+            rescale_grad => $self->rescale_grad
         );
-        my $adjusted_add = AI::MXNet::NDArray->_scatter_plus_scalar($history, $self->float_stable_eps);
-        my $srt = $adjusted_add->sqrt;
-        my $div = AI::MXNet::NDArray->_scatter_elemwise_div($grad, $srt);
-        my $retained_weight = AI::MXNet::NDArray::Sparse->retain($weight, $grad->indices);
-        my $to_add = AI::MXNet::NDArray::Sparse->elemwise_add(
-            $div,
-            AI::MXNet::NDArray->_mul_scalar(
-                $retained_weight, $wd
-            )
-        );
-        $weight .= AI::MXNet::NDArray::Sparse->elemwise_add(
-            $weight,
-            AI::MXNet::NDArray->_mul_scalar($to_add, -$lr)
-        );
-        $state .= $history;
+        if($self->clip_gradient)
+        {
+            $kwargs{clip_gradient} = $self->clip_gradient;
+        }
+        AI::MXNet::NDArray::Sparse->adagrad_update($weight, $grad, $history, { out=>$weight, lr=>$lr, wd=>$wd, %kwargs });
     }
     else
     {
+        $grad *= $self->rescale_grad;
+        if(defined $self->clip_gradient)
+        {
+            $grad = AI::MXNet::NDArray->clip($grad, -$self->clip_gradient, $self->clip_gradient);
+        }
         $history += $grad->square;
-        my $div = $grad / ($history + $self->float_stable_eps)->sqrt;
+        my $div = $grad / ($history + $self->eps)->sqrt;
         $weight += ($div + $weight * $wd) * -$lr;
     }
 }

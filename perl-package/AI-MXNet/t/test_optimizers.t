@@ -609,6 +609,32 @@ method update($index, $weight, $grad, $state)
     }
 }
 
+package PerlAdaGrad;
+use Mouse;
+extends 'AI::MXNet::Optimizer';
+
+has 'eps' => (is => 'rw', default => 1e-7);
+method create_state($index, $weight)
+{
+    mx->nd->zeros($weight->shape, ctx => $weight->context, stype => $weight->stype);
+}
+
+method update($index, $weight, $grad, $state)
+{
+    $self->_update_count($index);
+    my $wd = $self->_get_wd($index);
+    my $lr = $self->_get_lr($index);
+    my $num_rows = $weight->shape->[0];
+    my $history = $state;
+    $grad *= $self->rescale_grad;
+    if(defined $self->clip_gradient)
+    {
+        $grad = mx->nd->clip($grad, -$self->clip_gradient, $self->clip_gradient);
+    }
+    $history += mx->nd->square($grad);
+    my $div = $grad / mx->nd->sqrt($history + $self->eps);
+    $weight += ($div + $weight * $wd) * -$lr;
+}
 
 package main;
 use Carp;
@@ -1020,6 +1046,43 @@ sub test_ftrl
     }
 }
 
+sub test_adagrad
+{
+    mx->random->seed(0);
+    my $opt1 = 'PerlAdaGrad';
+    my $opt2 = mx->optimizer->AdaGrad;
+    my $shape = [3, 4, 5];
+    my @eps_options= ({}, {eps => 1e-9});
+    my @cg_options = ({}, {clip_gradient => 0.4}, {clip_gradient => 0.5});
+    my @rg_options = ({}, {rescale_grad  => 0.14}, {rescale_grad => 0.8});
+    my @wd_options = ({}, {wd => 0});
+    for my $dtype(qw/float32/)
+    {
+        for my $eps_option (@eps_options)
+        {
+            for my $cg_option (@cg_options)
+            {
+                for my $rg_option (@rg_options)
+                {
+                    for my $wd_option (@wd_options)
+                    {
+                        my %kwarg;
+                        %kwarg = (%kwarg, %$eps_option);
+                        %kwarg = (%kwarg, %$cg_option);
+                        %kwarg = (%kwarg, %$rg_option);
+                        %kwarg = (%kwarg, %$wd_option);
+                        compare_optimizer($opt1->new(%kwarg), $opt2->new(%kwarg), $shape, $dtype);
+                        if(($wd_option{wd}//0) == 0)
+                        {
+                            compare_optimizer($opt1->new(%kwarg), $opt2->new(%kwarg), $shape, $dtype, 'row_sparse', 'row_sparse');
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 test_adam();
 test_rms();
 test_sgd();
@@ -1029,6 +1092,7 @@ test_nag();
 test_ftml();
 test_signum();
 test_ftrl();
+test_adagrad();
 test_lr_wd_mult();
 
 
