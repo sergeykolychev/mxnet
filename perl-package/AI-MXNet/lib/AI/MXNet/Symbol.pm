@@ -242,8 +242,14 @@ method call(@args)
     return $s;
 }
 
-method slice(Str|Index $index)
+method slice(@slices)
 {
+    confess("No slices supplied") unless @slices;
+    if(@slices > 1)
+    {
+        return $self->SUPER::slice(@slices);
+    }
+    my $index = $slices[0];
     ## __getitem__ tie needs to die
     if(not find_type_constraint('Index')->check($index))
     {

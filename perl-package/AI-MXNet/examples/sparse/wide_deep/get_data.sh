@@ -25,9 +25,8 @@ if [[ ! -d "${DATA_DIR}" ]]; then
   mkdir -p ${DATA_DIR}
 fi
 
-wget -P ${DATA_DIR} http://files.grouplens.org/datasets/movielens/ml-10m.zip
+wget -P ${DATA_DIR} https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.data
+wget -P ${DATA_DIR} https://archive.ics.uci.edu/ml/machine-learning-databases/adult/adult.test
 cd ${DATA_DIR}
-unzip ml-10m.zip
-cd ml-10M100K
-chmod +x allbut.pl
-sh split_ratings.sh
+sed -i '1d' adult.test
+sed -i 's/.$//' adult.test

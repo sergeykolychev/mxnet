@@ -38,7 +38,7 @@ use List::Util qw(shuffle);
                               STORAGE_TYPE_UNDEFINED STORAGE_TYPE_DEFAULT
                               STORAGE_TYPE_ROW_SPARSE STORAGE_TYPE_CSR
                               STORAGE_TYPE_STR_TO_ID STORAGE_TYPE_ID_TO_STR STORAGE_AUX_TYPES);
-@AI::MXNet::Base::EXPORT_OK = qw(pzeros pceil pones);
+@AI::MXNet::Base::EXPORT_OK = qw(pzeros pceil pones digitize hash array_index range);
 
 use constant DTYPE_STR_TO_MX => {
     float32 => 0,
@@ -483,5 +483,21 @@ sub rand_sparse
     *PDL::len    = sub { shift->dim(-1) };
     *PDL::dtype  = sub { DTYPE_MX_TO_STR->{ DTYPE_PDL_TO_MX->{ shift->type->numval } } };
 }
+
+sub digitize
+{
+    my ($d, $bins) = @_;
+    for(my $i = 0; $i < @$bins; $i++)
+    {
+        return $i if $d < $bins->[$i];
+    }
+    return scalar(@$bins);
+}
+
+use B;
+sub hash { hex(B::hash(shift)) }
+use List::Util ();
+sub array_index { my ($s, $array) = @_; return List::Util::first { $array->[$_] eq $s } 0..@$array-1 }
+sub range { my ($begin, $end, $step) = @_; $step //= 1; grep { not (($_-$begin) % $step) } $begin..$end-1 }
 
 1;

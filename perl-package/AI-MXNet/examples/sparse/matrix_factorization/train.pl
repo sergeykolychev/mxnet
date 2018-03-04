@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -16,7 +16,6 @@
 # KIND, either express or implied.  See the License for the
 # specific language governing permissions and limitations
 # under the License.
-#!/usr/bin/perl
 
 use strict;
 use warnings;
@@ -156,7 +155,7 @@ $mod->init_optimizer(optimizer=>$optim);
 my $metric = mx->metric->create(['MSE']);
 my $speedometer = mx->callback->Speedometer($batch_size, $print_every);
 print "Training started ...\n";
-for my $epoch (0..$num_epoch)
+for my $epoch (0..$num_epoch-1)
 {
     my $nbatch = 0;
     $metric->reset();
@@ -176,9 +175,7 @@ for my $epoch (0..$num_epoch)
     }
     # evaluate metric on validation dataset
     my $score = $mod->score($val_iter, ['MSE']);
-    use Data::Dumper;
-    print Dumper $score;
-    #printf("epoch %d, eval MSE = %s \n", $epoch, $score->[0][1]);
+    printf("epoch %d, eval MSE = %s \n", $epoch, $score->{mse});
     # reset the iterator for next pass of data
     $train_iter->reset();
     $val_iter->reset();
