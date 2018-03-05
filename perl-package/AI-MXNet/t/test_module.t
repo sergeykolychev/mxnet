@@ -17,7 +17,7 @@
 
 use strict;
 use warnings;
-use Test::More tests => 425;
+use Test::More tests => 426;
 use AI::MXNet qw(mx);
 use AI::MXNet::Base;
 use AI::MXNet::TestUtils qw(almost_equal enumerate same_array dies_like rand_ndarray);
@@ -597,7 +597,7 @@ sub test_factorization_machine_module
 
     $check_factorization_machine_module->('sgd');
     $check_factorization_machine_module->('adam');
-    # $check_factorization_machine_module->('adagrad'); it works but too slow for the tests cause it's not implemented in C++ layer
+    $check_factorization_machine_module->('adagrad');
 }
 
 

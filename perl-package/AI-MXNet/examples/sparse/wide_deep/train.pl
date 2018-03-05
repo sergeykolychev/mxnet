@@ -244,7 +244,7 @@ my $train_data = mx->io->NDArrayIter(
     data  => Hash::Ordered->new(csr_data => $train_csr, dns_data => $train_dns),
     label => Hash::Ordered->new(softmax_label => $train_label), 
     batch_size => $batch_size,
-    shuffle => 0,
+    shuffle => 1,
     last_batch_handle => 'discard'
 );
 my $eval_data = mx->io->NDArrayIter(

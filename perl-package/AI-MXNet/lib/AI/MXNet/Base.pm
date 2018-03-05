@@ -21,8 +21,8 @@ use warnings;
 use PDL;
 use PDL::Types ();
 use PDL::CCS::Nd;
-use AI::MXNetCAPI 1.1;
-use AI::NNVMCAPI 1.1;
+use AI::MXNetCAPI 1.2;
+use AI::NNVMCAPI 1.2;
 use AI::MXNet::Types;
 use Time::HiRes;
 use Scalar::Util qw(blessed);
@@ -31,7 +31,7 @@ use Exporter;
 use base qw(Exporter);
 use List::Util qw(shuffle);
 
-@AI::MXNet::Base::EXPORT = qw(product enumerate assert zip check_call build_param_doc pdlccs_shuffle
+@AI::MXNet::Base::EXPORT = qw(product enumerate assert zip check_call build_param_doc
                               pdl cat dog svd bisect_left pdl_shuffle as_array ascsr rand_sparse
                               DTYPE_STR_TO_MX DTYPE_MX_TO_STR DTYPE_MX_TO_PDL
                               DTYPE_PDL_TO_MX DTYPE_MX_TO_PERL GRAD_REQ_MAP
@@ -226,44 +226,12 @@ sub bisect_left
     as shuffled last dimension's indexes
 =cut
 
-
 sub pdl_shuffle
 {
     my ($pdl, $preshuffle) = @_;
-    my $c = $pdl->copy;
     my @shuffle = $preshuffle ? @{ $preshuffle } : shuffle(0..$pdl->dim(-1)-1);
-    my $rem = $pdl->ndims-1;
-    for my $i (0..$pdl->dim(-1)-1)
-    {
-        $c->slice(('X')x$rem, $i) .= $pdl->slice(('X')x$rem, $shuffle[$i])
-    }
-    $c;
+    return $pdl->dice_axis(-1, pdl(\@shuffle));
 }
-
-=head2 pdlccs_shuffle
-
-    Shuffle the two dimensional PDL::CCS::Nd by the last dimension
-
-    Parameters
-    -----------
-    PDL::CCS::Nd $pdl
-    $preshuffle Maybe[ArrayRef[Index]], if defined the array elements are used
-    as shuffled last dimension's indexes
-=cut
-
-
-sub pdlccs_shuffle
-{
-    my ($pdl, $preshuffle) = @_;
-    my $c = $pdl->copy;
-    my @shuffle = $preshuffle ? @{ $preshuffle } : shuffle(0..$pdl->dim(-1)-1);
-    for my $i (0..$pdl->dim(-1)-1)
-    {
-        $c->indexND(pdl([map { [$_, $i] } 0..$pdl->dim(0)-1])) .= $pdl->indexND(pdl([map { [$_, $shuffle[$i]] } 0..$pdl->dim(0)-1]))
-    }
-    $c;
-}
-
 
 =head2 assert
 

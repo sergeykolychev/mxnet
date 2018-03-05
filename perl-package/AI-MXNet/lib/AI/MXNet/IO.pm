@@ -476,7 +476,7 @@ sub BUILD
     {
         my @idx = List::Util::shuffle(0..$num_data-1);
         $_->[1] = AI::MXNet::NDArray->array(
-            $_->[1]->stype eq 'csr' ? pdlccs_shuffle($_->[1]->aspdlccs, \@idx) : pdl_shuffle($_->[1]->aspdl, \@idx),
+            pdl_shuffle($_->[1]->stype eq 'csr' ? $_->[1]->aspdlccs : $_->[1]->aspdl, \@idx),
             ctx => $_->[1]->context
         ) for (@$data, @$label);
     }
